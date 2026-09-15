@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trackcare Relay</title>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:#111827;background:#f3f4f6}*{box-sizing:border-box}body{margin:0}.wrap{max-width:960px;margin:0 auto;padding:24px 16px 60px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.brand{font-size:20px;font-weight:800}.status{font-size:12px;padding:6px 10px;border-radius:999px;background:#e5e7eb}.status.live{background:#dcfce7;color:#166534}.card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:16px;margin-bottom:16px}.label{font-size:13px;font-weight:750;margin-bottom:9px;color:#374151}textarea{width:100%;min-height:330px;resize:vertical;border:1px solid #d1d5db;border-radius:10px;padding:13px;font:14px/1.55 ui-monospace,Consolas,monospace;outline:none}.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}button{border:0;border-radius:9px;padding:9px 13px;font-weight:700;cursor:pointer;background:#111827;color:#fff;font-size:13px}button.secondary{background:#e5e7eb;color:#111827}button.danger{background:#fee2e2;color:#991b1b}.muted{font-size:12px;color:#6b7280}.upload{border:1.5px dashed #cbd5e1;border-radius:12px;padding:20px;text-align:center;background:#f8fafc}.files{display:flex;flex-direction:column;gap:8px;margin-top:12px}.file{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px}.fname{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.meta{font-size:11px;color:#6b7280;margin-top:3px}.actions{display:flex;gap:6px}.actions button{padding:7px 9px}.gate{position:fixed;inset:0;background:rgba(17,24,39,.58);display:flex;align-items:center;justify-content:center;padding:20px;z-index:20}.gatebox{width:min(420px,100%);background:#fff;border-radius:14px;padding:18px}.gatebox input{width:100%;border:1px solid #d1d5db;border-radius:9px;padding:11px;font-size:15px;margin:10px 0}.hidden{display:none!important}@media(max-width:640px){.wrap{padding:16px 12px 40px}.file{grid-template-columns:1fr}textarea{min-height:280px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div class="brand">Trackcare Relay</div><div id="status" class="status">Locked</div></div>
+  <div class="card">
+    <div class="label">Latest Output</div>
+    <textarea id="note" spellcheck="false" placeholder="Latest text will appear here..."></textarea>
+    <div class="row"><button id="copy">Copy</button><button id="save" class="secondary">Save changes</button><span id="updated" class="muted"></span></div>
+  </div>
+  <div class="card">
+    <div class="label">Files</div>
+    <div id="drop" class="upload">
+      <input id="fileInput" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif" multiple hidden>
+      <button id="choose" class="secondary">Upload PDF / Image</button>
+      <div class="muted" style="margin-top:8px">Drop files here. Max 12 MB per file.</div>
+      <div id="progress" class="muted" style="margin-top:6px"></div>
+    </div>
+    <div id="files" class="files"></div>
+  </div>
+</div>
+<div id="gate" class="gate"><div class="gatebox"><div style="font-weight:800;font-size:17px">Access code</div><div class="muted" style="margin-top:5px">Enter the Trackcare Relay code once on this browser.</div><input id="code" type="password" placeholder="Access code"><button id="unlock" style="width:100%">Open Relay</button><div id="gateError" class="muted" style="color:#991b1b;margin-top:8px"></div></div></div>
+<script>
+const API='https://gvuuiazenabtsbmozrbk.supabase.co/functions/v1/relay-api';
+let key=localStorage.getItem('trackcare_relay_key')||'',lastRemote='',dirty=false,pollTimer=null;
+const note=document.getElementById('note'),statusEl=document.getElementById('status'),filesEl=document.getElementById('files'),updatedEl=document.getElementById('updated'),gate=document.getElementById('gate'),codeInput=document.getElementById('code'),gateError=document.getElementById('gateError');
+async function api(action,options={}){const headers=new Headers(options.headers||{});headers.set('x-relay-key',key);const r=await fetch(API+'?action='+encodeURIComponent(action)+(options.extra||''),{...options,headers,cache:'no-store'});if(r.status===401){lock();throw new Error('Unauthorized')}const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||'Request failed');return data}
+function lock(){localStorage.removeItem('trackcare_relay_key');key='';gate.classList.remove('hidden');statusEl.className='status';statusEl.textContent='Locked';if(pollTimer)clearInterval(pollTimer)}
+function online(){statusEl.className='status live';statusEl.textContent='Live'}
+function fmtBytes(n){n=Number(n||0);if(n<1024)return n+' B';if(n<1048576)return (n/1024).toFixed(1)+' KB';return (n/1048576).toFixed(1)+' MB'}
+function fmtDate(s){try{return new Date(s).toLocaleString()}catch(e){return ''}}
+async function refresh(){if(!key)return;try{const d=await api('state');online();if(!dirty&&document.activeElement!==note&&d.content!==lastRemote)note.value=d.content||'';lastRemote=d.content||'';updatedEl.textContent=d.updated_at?'Updated '+fmtDate(d.updated_at):'';renderFiles(d.files||[])}catch(e){if(String(e.message)!=='Unauthorized'){statusEl.className='status';statusEl.textContent='Offline'}}}
+function renderFiles(items){filesEl.innerHTML='';if(!items.length){filesEl.textContent='No files.';return}for(const f of items){const el=document.createElement('div');el.className='file';const left=document.createElement('div'),nm=document.createElement('div'),mt=document.createElement('div');nm.className='fname';nm.textContent=f.file_name;mt.className='meta';mt.textContent=fmtBytes(f.file_size)+' · '+fmtDate(f.created_at);left.append(nm,mt);const acts=document.createElement('div');acts.className='actions';const open=document.createElement('button');open.className='secondary';open.textContent='Open';open.onclick=()=>openFile(f.id);const del=document.createElement('button');del.className='danger';del.textContent='Delete';del.onclick=()=>deleteFile(f.id,f.file_name);acts.append(open,del);el.append(left,acts);filesEl.append(el)}}
+async function openFile(id){const d=await api('file_url',{extra:'&id='+encodeURIComponent(id)});window.open(d.url,'_blank','noopener')}
+async function deleteFile(id,name){if(!confirm('Delete '+name+'?'))return;await api('delete_file',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id})});await refresh()}
+note.addEventListener('input',()=>dirty=true);
+document.getElementById('copy').onclick=async()=>{await navigator.clipboard.writeText(note.value);const b=document.getElementById('copy'),old=b.textContent;b.textContent='Copied';setTimeout(()=>b.textContent=old,900)};
+document.getElementById('save').onclick=async()=>{const b=document.getElementById('save');b.disabled=true;try{const d=await api('note',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({content:note.value})});lastRemote=note.value;dirty=false;updatedEl.textContent='Updated '+fmtDate(d.updated_at)}finally{b.disabled=false}};
+const input=document.getElementById('fileInput'),drop=document.getElementById('drop'),progress=document.getElementById('progress');document.getElementById('choose').onclick=()=>input.click();input.onchange=()=>uploadMany(Array.from(input.files));['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault()}));['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault()}));drop.addEventListener('drop',e=>uploadMany(Array.from(e.dataTransfer.files)));
+async function uploadMany(list){for(const file of list){if(file.size>12*1024*1024){progress.textContent=file.name+' is larger than 12 MB';continue}progress.textContent='Uploading '+file.name+'...';const fd=new FormData();fd.append('file',file,file.name);try{await api('upload',{method:'POST',body:fd});progress.textContent='Uploaded '+file.name}catch(e){progress.textContent='Upload failed: '+e.message}}input.value='';await refresh();setTimeout(()=>progress.textContent='',2500)}
+async function unlock(){const v=codeInput.value.trim();if(!v)return;key=v;gateError.textContent='';try{await api('state');localStorage.setItem('trackcare_relay_key',key);gate.classList.add('hidden');online();await refresh();if(pollTimer)clearInterval(pollTimer);pollTimer=setInterval(refresh,2000)}catch(e){key='';gateError.textContent='Wrong code or connection error.'}}
+document.getElementById('unlock').onclick=unlock;codeInput.addEventListener('keydown',e=>{if(e.key==='Enter')unlock()});if(key){codeInput.value=key;unlock()}
+</script>
+</body>
+</html>
