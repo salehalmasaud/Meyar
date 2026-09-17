@@ -1,0 +1,22 @@
+{
+  "realtime": "SUBSCRIBED",
+  "live_note_ms": 3878,
+  "exact_copy_argument": true,
+  "clipboard_line_endings": "Windows CRLF",
+  "reload_without_pin": true,
+  "phone_to_pc": true,
+  "pc_to_phone": true,
+  "download": true,
+  "open_image": true,
+  "open_pdf_response": true,
+  "responsive": true,
+  "copy_failure_keeps_note": true,
+  "copy_clear": true,
+  "delete_all": true,
+  "fallback_ms": 5888,
+  "recovery": true,
+  "lock_revokes": true,
+  "expiry": true,
+  "ui_session_expiry": true,
+  "at": "2026-09-17T12:33:45.361Z"
+}
