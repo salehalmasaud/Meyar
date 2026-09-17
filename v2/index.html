@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light"><meta name="robots" content="noindex,nofollow">
+  <title>Trackcare Relay</title><link rel="icon" type="image/svg+xml" href="/relay.svg"><link rel="stylesheet" href="/app.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="header">
+      <a class="brand" href="/" aria-label="Trackcare Relay home"><img src="/relay.svg" width="38" height="38" alt=""><span>Trackcare <strong>Relay</strong><small>Your phone. Your workstation. Connected.</small></span></a>
+      <div class="header-right"><span id="preview-badge" class="preview-badge">V2 PREVIEW · TEST DATA ONLY</span><span id="status" class="status" data-state="locked" role="status">Locked</span></div>
+    </header>
+    <main>
+      <section id="gate" class="gate" aria-labelledby="gate-title">
+        <div class="gate-symbol" aria-hidden="true">↔</div>
+        <p class="eyebrow">A PRIVATE BRIDGE</p><h1 id="gate-title">Ready when you are.</h1>
+        <p class="gate-description">Connect to your latest output and temporary files.<br>Enter your access code to open this session.</p>
+        <form id="unlock-form"><label for="code">Access code</label><input id="code" type="password" inputmode="numeric" maxlength="32" autocomplete="off" required placeholder="•••" aria-describedby="gate-error"><button id="unlock" class="primary" type="submit" disabled>Open Relay <span aria-hidden="true">→</span></button></form>
+        <p id="gate-error" class="gate-error" role="status"></p><p class="gate-foot">Private access · Temporary content · Automatic expiry</p>
+      </section>
+      <div id="workspace" hidden>
+        <div class="workspace-bar"><p><span class="small-dot"></span> Your relay workspace</p><div><button id="forget" class="text-button">Unpair device</button><button id="lock" class="lock-button">Lock <span aria-hidden="true">↗</span></button></div></div>
+        <section class="card output-card" aria-labelledby="output-title">
+          <div class="card-heading"><div><p class="eyebrow">PHONE → WORKSTATION</p><h1 id="output-title">Latest Output</h1></div><span id="note-marker" class="subtle-label">Awaiting output</span></div>
+          <div class="note-meta"><span id="received"></span><span id="note-expiry"></span></div>
+          <div id="empty-note" class="empty-note"><span class="waiting-icon" aria-hidden="true">↳</span><h2>Waiting for next output…</h2><p>Your next note will appear here automatically.<br>Keep this page open. We’ll take care of the rest.</p></div>
+          <pre id="note" class="note" tabindex="0" aria-label="Latest output, read only" dir="auto" hidden></pre>
+          <div class="note-toolbar"><div class="button-group"><button id="copy" class="primary" disabled>Copy</button><button id="copy-clear" class="secondary" disabled>Copy &amp; Clear</button><button id="clear" class="text-button danger" disabled>Clear</button></div><span class="read-only-label">Read only · Formatting preserved</span></div>
+          <p id="message" class="message" role="status" aria-live="polite"></p>
+        </section>
+        <div id="confirmation" class="confirmation" role="group" aria-label="Confirm removal" hidden><span id="confirm-text"></span><div><button id="cancel-action" class="secondary">Cancel</button><button id="confirm-action" class="danger-button">Confirm</button></div></div>
+        <section class="card files-card" aria-labelledby="files-title">
+          <div class="card-heading"><div><p class="eyebrow">BETWEEN YOUR DEVICES</p><h2 id="files-title">Files <span id="file-count" class="count">0</span></h2><p id="file-ttl" class="section-description">Files are temporary · 24 hours</p></div><button id="delete-all" class="text-button danger" disabled>Delete all files</button></div>
+          <div id="drop" class="drop"><div class="upload-symbol" aria-hidden="true">↑</div><div><strong>Drop files here to send them across</strong><p>PDF, JPEG, PNG, WEBP, HEIC / HEIF · Up to 20 MB each</p></div><button id="choose" class="secondary">Choose files</button><input id="file-input" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif" hidden></div>
+          <div class="device-label"><label for="device-label">This device</label><select id="device-label"><option>Work computer</option><option>Phone</option><option>Device</option></select></div>
+          <div id="queue" class="queue" aria-live="polite"></div><div id="files" class="files"></div><p id="empty-files" class="empty-files">No files yet. Upload from either device to get started.</p>
+        </section>
+        <footer class="footer"><span class="privacy-mark" aria-hidden="true">◇</span><p>Made for the moment.<br><span id="text-ttl">Outputs disappear after 30 minutes.</span> No patient-content history.</p><span class="footer-wordmark">TRACKCARE RELAY</span></footer>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
