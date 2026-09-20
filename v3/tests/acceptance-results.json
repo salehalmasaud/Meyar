@@ -1,0 +1,14 @@
+{
+  "at": "2026-09-20T07:46:28.767Z",
+  "notes": [
+    "Test Note A",
+    "Test Note B",
+    "Test Note C"
+  ],
+  "simultaneously_visible": true,
+  "first_copied": true,
+  "refresh_retained_all": true,
+  "note_count": 3,
+  "ttl_hours": 12,
+  "remaining_files": 0
+}

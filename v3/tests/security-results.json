@@ -1,0 +1,20 @@
+{
+  "checked_at": "2026-09-20T07:38:39Z",
+  "supabase_security_warnings": 0,
+  "supabase_security_errors": 0,
+  "informational_only": "RLS enabled without public policies; intentional service-role-only access",
+  "v3_tables_with_rls": 6,
+  "v3_public_table_grants": 0,
+  "v3_public_rpc_execute_grants": 0,
+  "storage_private": true,
+  "legacy_relay_set_note_anon_execute": false,
+  "legacy_relay_set_note_authenticated_execute": false,
+  "cron_active": true,
+  "production_netlify_deploy": "6aaa498ed4d229964811995b",
+  "production_unchanged": true,
+  "v1_v2_function_source_hashes_unchanged": true,
+  "v2_source_sha256": "17041df77c1640b6a604631ba9082bcd5cfc66503a748ab978216c1c319720df",
+  "provider_revision_note": "Existing function counters increased when V3 project secrets were added; source hashes and source timestamps unchanged.",
+  "npm_production_vulnerabilities": 0,
+  "provisioned_secret_scan": "passed"
+}

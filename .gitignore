@@ -7,5 +7,6 @@ dist/
 test-results/
 playwright-report/
 v2/artifacts/
+v3/artifacts/
 supabase/.temp/
 *.local.*

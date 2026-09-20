@@ -1,0 +1,94 @@
+{
+  "at": "2026-09-20T07:28:16.262Z",
+  "passed": 22,
+  "results": [
+    {
+      "name": "viewer secret required; PIN alone cannot enter",
+      "ms": 3056
+    },
+    {
+      "name": "viewer secret exchange and PIN 000 login",
+      "ms": 5430
+    },
+    {
+      "name": "first append, multiple append and ordering",
+      "ms": 10442
+    },
+    {
+      "name": "independent 12-hour TTL for each note",
+      "ms": 743
+    },
+    {
+      "name": "encrypted GET appends without plaintext URL",
+      "ms": 2431
+    },
+    {
+      "name": "replay rejection acknowledges same delivery without duplicate",
+      "ms": 3788
+    },
+    {
+      "name": "duplicate version and stale version rejected",
+      "ms": 2456
+    },
+    {
+      "name": "nonce reuse rejected even with new valid version",
+      "ms": 2736
+    },
+    {
+      "name": "invalid signature",
+      "ms": 341
+    },
+    {
+      "name": "invalid ciphertext with valid HMAC",
+      "ms": 363
+    },
+    {
+      "name": "stale timestamp rejected",
+      "ms": 364
+    },
+    {
+      "name": "wrong PIN throttles across attempts",
+      "ms": 6819
+    },
+    {
+      "name": "expired session rejected by server",
+      "ms": 4637
+    },
+    {
+      "name": "file upload and encrypted private storage",
+      "ms": 4929
+    },
+    {
+      "name": "PDF upload and exact signed download",
+      "ms": 6299
+    },
+    {
+      "name": "byte validation rejects filename and MIME spoof",
+      "ms": 1724
+    },
+    {
+      "name": "20 MB file accepted; larger file rejected server-side",
+      "ms": 28828
+    },
+    {
+      "name": "expired signed URL rejected and cannot outlive file TTL",
+      "ms": 1132
+    },
+    {
+      "name": "expiry filtering hides only expired note",
+      "ms": 4248
+    },
+    {
+      "name": "unattended scheduled physical note/file cleanup",
+      "ms": 50772
+    },
+    {
+      "name": "clear selected snapshots keeps a newer arrival",
+      "ms": 6992
+    },
+    {
+      "name": "lock revokes access until PIN is entered again",
+      "ms": 2868
+    }
+  ]
+}

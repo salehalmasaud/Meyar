@@ -1,0 +1,25 @@
+{
+  "name": "trackcare-relay-v3",
+  "version": "3.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "test:browser": "playwright test",
+    "dev": "netlify dev",
+    "push-note": "tsx scripts/push-note.ts"
+  },
+  "devDependencies": {
+    "@netlify/functions": "6.0.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.20.3",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.13",
+    "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "@supabase/realtime-js": "2.116.0"
+  }
+}

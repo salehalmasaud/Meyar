@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-20T07:45:56.616Z",
+  "site": "https://trackcare-relay-v3--trackcare-relay.netlify.app",
+  "assets_match_local_build": true,
+  "security_headers": true,
+  "sha256": {
+    "index.html": "42c9a3a85ff3e3d0faa034931ab5acd3d6a686af0bf272a8409732dfc76ade28",
+    "app.js": "30083288bf9dafeec1fcfa1c35480a76122d23e69be05e5edd2a6ff6e08f008c",
+    "app.css": "31577d2f827166050341ea9dad224e0c08f61ab44fb71b8d80322857f4be9988",
+    "relay.svg": "c7cc7a3fef9a54195ff4d28b18c9814e84645801850117d30de741b22ab64226"
+  }
+}
