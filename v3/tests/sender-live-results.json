@@ -1,0 +1,16 @@
+{
+  "at": "2026-09-20T09:00:09.986Z",
+  "passed": 9,
+  "results": [
+    "OAuth discovery and unauthenticated MCP denial",
+    "DCR rejects other callbacks and accepts exact ChatGPT callback",
+    "OAuth authorization requires unlocked private viewer",
+    "PKCE, audience, one-use codes and OAuth tokens",
+    "MCP initialize and exactly one simple send_note action",
+    "two consecutive send_note calls append exact A and B",
+    "same MCP request retry returns identical receipt without duplication",
+    "new intentional request with identical text appends separately",
+    "OAuth refresh rotates, old refresh rejected and grant revokes"
+  ],
+  "chatgpt_conversation_test": false
+}

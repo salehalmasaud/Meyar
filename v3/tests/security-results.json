@@ -1,20 +1,36 @@
 {
-  "checked_at": "2026-09-20T07:38:39Z",
-  "supabase_security_warnings": 0,
-  "supabase_security_errors": 0,
-  "informational_only": "RLS enabled without public policies; intentional service-role-only access",
-  "v3_tables_with_rls": 6,
-  "v3_public_table_grants": 0,
-  "v3_public_rpc_execute_grants": 0,
-  "storage_private": true,
-  "legacy_relay_set_note_anon_execute": false,
-  "legacy_relay_set_note_authenticated_execute": false,
-  "cron_active": true,
-  "production_netlify_deploy": "6aaa498ed4d229964811995b",
-  "production_unchanged": true,
-  "v1_v2_function_source_hashes_unchanged": true,
-  "v2_source_sha256": "17041df77c1640b6a604631ba9082bcd5cfc66503a748ab978216c1c319720df",
-  "provider_revision_note": "Existing function counters increased when V3 project secrets were added; source hashes and source timestamps unchanged.",
-  "npm_production_vulnerabilities": 0,
-  "provisioned_secret_scan": "passed"
+  "at": "2026-09-20T09:05:28.697Z",
+  "project": "gvuuiazenabtsbmozrbk",
+  "security_advisors": {
+    "warnings": 0,
+    "errors": 0,
+    "info_type": "rls_enabled_no_policy",
+    "info_total": 22,
+    "info_v3": 11,
+    "reason": "Intentional deny-by-default service-role-only tables",
+    "reference": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy"
+  },
+  "sql": {
+    "v3_rls_tables": 11,
+    "public_table_grants": 0,
+    "anonymous_authenticated_rpc_access": 0,
+    "legacy_relay_set_note_execute_revoked": true,
+    "private_storage": true,
+    "active_cleanup_jobs": [
+      "relay-v3-expiry-sweep",
+      "relay-v3-sender-expiry"
+    ]
+  },
+  "deployment": {
+    "netlify_preview": "6aaf9fe75671610bc8dbdc44",
+    "relay_v3_version": 6,
+    "relay_v3_sha256": "01ee2d015f9b8477837a7d074b2cae901d264b3ac384a420bc09d2563e0080bd",
+    "v1_production_unchanged": "6aaa498ed4d229964811995b",
+    "legacy_unchanged": {
+      "work-relay": "daa1f2d7439698a6779da4b7ae28efd3ac321f474619f6087dbca30ececf3c79",
+      "relay-api": "425ab07b58d7cf7a5b866d36c01103218a02de4de5cfc7d30a67a39520cd6b43",
+      "push-note": "388256033e8451eb62bb03eccbca9cadb855fdf66c082a462407250c340328b0",
+      "relay-v2": "17041df77c1640b6a604631ba9082bcd5cfc66503a748ab978216c1c319720df"
+    }
+  }
 }

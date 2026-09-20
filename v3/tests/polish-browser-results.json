@@ -1,0 +1,25 @@
+{
+  "at": "2026-09-20T09:07:16.434Z",
+  "results": {
+    "patient_preview_and_exact_whitespace": true,
+    "content_sized_cards": true,
+    "absolute_expiry": true,
+    "copy_next_count_focus_incremental_dom": true,
+    "keyboard_copy_navigation": true,
+    "clear_copied_exact_count": true,
+    "compact_expand": true,
+    "preference_and_copied_persistence": true,
+    "system_theme": true,
+    "file_metadata": true,
+    "pdf_unsupported_fallback": true,
+    "image_pdf_modal_escape": true,
+    "real_clipboard_image_paste": true,
+    "paste_and_shortcuts_ignore_fields": true,
+    "twenty_notes_order_ms": 9,
+    "delete_number_follows_sort": true,
+    "responsive": true,
+    "preference_ids_only_storage": true,
+    "lock_immediate_hide_rotates_session": true,
+    "no_browser_errors": true
+  }
+}

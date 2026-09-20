@@ -1,6 +1,6 @@
 import {RealtimeClient} from '@supabase/realtime-js';
 import {copyExact} from './clipboard.ts';
-import {ordered,nextNote,metadata,activeNotes,type Note,type RelayFile} from './model.ts';
+import {ordered,nextNote,metadata,activeNotes,remainingCount,expiryLabel,preference,type Note,type RelayFile} from './model.ts';
 const $=<T extends HTMLElement>(id:string)=>document.getElementById(id) as T;
 type Config={expires_at:string;text_ttl:number;file_ttl:number;realtime:{url:string;anon:string;topic:string}};
 type State={revision:number;notes:Note[];files:RelayFile[];server_time:number;unchanged?:boolean};
@@ -10,6 +10,15 @@ const controllers=new Set<AbortController>(),uploads=new Set<XMLHttpRequest>();
 const thumbnailObservers=new Set<IntersectionObserver>();
 const COPIED_KEY='relay-v3-copied';
 let copied=new Set<string>();try{const ids=JSON.parse(localStorage.getItem(COPIED_KEY)||'[]');if(Array.isArray(ids))copied=new Set(ids.filter(x=>typeof x==='string'&&/^[0-9a-f-]{36}$/.test(x)));}catch{/* Storage is optional. */}
+const readPreference=(key:string)=>{try{return localStorage.getItem(key);}catch{return null;}};
+let view=preference(readPreference('relay-v3-view'),['comfortable','compact'],'comfortable');
+let theme=preference(readPreference('relay-v3-theme'),['system','light','dark'],'system');
+let selectedId='',previewId='';const expanded=new Set<string>();
+const themeQuery=matchMedia('(prefers-color-scheme: dark)');
+function applyTheme(){document.documentElement.dataset.theme=theme==='system'?(themeQuery.matches?'dark':'light'):theme;}
+applyTheme();themeQuery.addEventListener('change',applyTheme);
+const persist=(key:string,value:string)=>{try{localStorage.setItem(key,value);}catch{}};
+const typing=(target:EventTarget|null)=>target instanceof Element&&!!target.closest('input,textarea,select,[contenteditable="true"],[role="textbox"]');
 const saveCopied=()=>{try{localStorage.setItem(COPIED_KEY,JSON.stringify([...copied]));}catch{/* In-memory state still works. */}};
 const now=()=>Date.now()+offset;
 const time=(s:string)=>new Date(s).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
@@ -26,6 +35,7 @@ async function request<T>(path:string,body?:unknown):Promise<T>{
 function setStatus(){const s=$('status');s.textContent=!config?'Locked':!reachable?'Offline':live?'Live':'Fallback';s.dataset.state=!config?'locked':!reachable?'offline':live?'live':'fallback';}
 function hideWorkspace(text=''){
  generation++;config=null;notes=[];files=[];revision=-1;filesKey='';refreshing=false;pending=false;live=false;reachable=false;
+ selectedId='';expanded.clear();closePreview();$<HTMLDialogElement>('shortcuts').close();
  clearTimeout(poll);client?.disconnect();client=null;for(const c of controllers)c.abort();for(const u of uploads)u.abort();uploads.clear();
  for(const observer of thumbnailObservers)observer.disconnect();thumbnailObservers.clear();
  $('notes').replaceChildren();$('files').replaceChildren();$('queue').replaceChildren();$('workspace').hidden=true;$('gate').hidden=false;$('lock').hidden=true;
@@ -35,7 +45,9 @@ function updateSummary(){
  $('note-count').textContent=String(notes.length);$('note-summary').textContent=`${notes.length} ${notes.length===1?'note':'notes'}`;
  const latest=ordered(notes,true)[0];$('received-summary').textContent=latest?'Last received '+time(latest.received_at):'Waiting for your first note';
  const completed=notes.filter(n=>copied.has(n.id)).length;
- $('copy-summary').textContent=notes.length?`${notes.length-completed} to copy · ${completed} completed`:'Ready to receive';
+ $('copy-summary').textContent=notes.length?`${notes.length-completed} remaining · ${completed} copied`:'Ready to receive';
+ $('remaining-summary').textContent=`${remainingCount(notes,copied)} remaining`;
+ $('copy-next').textContent=remainingCount(notes,copied)?`Copy next · ${remainingCount(notes,copied)} remaining`:'All notes copied ✓';
  $<HTMLButtonElement>('copy-next').disabled=!nextNote(notes,copied);$<HTMLButtonElement>('clear-copied').disabled=!completed;$<HTMLButtonElement>('clear-all').disabled=!notes.length;
  $('empty-notes').hidden=notes.length>0;
 }
@@ -46,16 +58,28 @@ function noteCard(note:Note,index:number){
  const received=document.createElement('time');received.className='note-time';received.dateTime=note.received_at;received.textContent=time(note.received_at);top.append(label,received);card.append(top);
  const meta=metadata(note.text);
  for(const [content,css]of[[meta.pt,'note-patient'],[meta.dx,'note-dx']])if(content){const p=document.createElement('p');p.className=css;p.textContent=content;card.append(p);}
- const text=document.createElement('pre');text.className='note-text';text.textContent=note.text;card.append(text);
- const bottom=document.createElement('div');bottom.className='note-bottom';const left=document.createElement('span');left.className='expiry';left.dataset.expires=note.expires_at;left.textContent=expiry(note.expires_at);
+ const text=document.createElement('pre');text.className='note-text';text.id='text-'+note.id;text.textContent=note.text;if(meta.pt||meta.dx)text.classList.add('with-preview');card.append(text);
+ const bottom=document.createElement('div');bottom.className='note-bottom';const left=document.createElement('div');left.className='expiry-info';const absolute=document.createElement('span');absolute.dataset.expiryAbsolute=note.expires_at;absolute.textContent=expiryLabel(note.expires_at,now());const countdown=document.createElement('span');countdown.className='expiry';countdown.dataset.expires=note.expires_at;countdown.textContent=expiry(note.expires_at);left.append(absolute,countdown);
  const actions=document.createElement('div');actions.className='note-actions';const copy=document.createElement('button');copy.className='note-copy';copy.textContent=copied.has(note.id)?'Copied ✓':'Copy';copy.onclick=()=>void copyNote(note,false);
- const del=document.createElement('button');del.className='text-button danger';del.textContent='Delete';del.setAttribute('aria-label',`Delete Note ${String(index+1).padStart(2,'0')}`);del.onclick=()=>confirm(`Delete Note ${String(index+1).padStart(2,'0')}?`,'This note will be removed from your inbox. This cannot be undone.','Delete',()=>deleteNotes([note.id]));
- actions.append(copy,del);bottom.append(left,actions);card.append(bottom);return card;
+ const del=document.createElement('button');del.className='text-button danger';del.textContent='Delete';del.onclick=()=>confirm(`Delete ${label.textContent}?`,'This note will be removed from your inbox. This cannot be undone.','Delete',()=>deleteNotes([note.id]));
+ const expand=document.createElement('button');expand.className='text-button expand';expand.setAttribute('aria-controls',text.id);expand.onclick=()=>{expanded.has(note.id)?expanded.delete(note.id):expanded.add(note.id);renderNotes();};
+ card.addEventListener('focusin',()=>{selectedId=note.id;});
+ card.addEventListener('click',e=>{if(view==='compact'&&!(e.target as Element).closest('button,a,pre'))expand.click();});
+ actions.append(expand,copy,del);bottom.append(left,actions);card.append(bottom);return card;
 }
 function renderNotes(){
- const focused=document.activeElement instanceof HTMLElement?document.activeElement.closest<HTMLElement>('.note-card')?.dataset.id:undefined;
- const shown=ordered(notes,$<HTMLSelectElement>('sort').value==='newest');$('notes').replaceChildren(...shown.map(noteCard));updateSummary();
- if(focused)document.getElementById('note-'+focused)?.focus({preventScroll:true});
+ const shown=ordered(notes,$<HTMLSelectElement>('sort').value==='newest'),list=$('notes');
+ const keep=new Set(shown.map(n=>n.id));for(const el of Array.from(list.children))if(!keep.has((el as HTMLElement).dataset.id!))el.remove();
+ shown.forEach((note,index)=>{
+  const card=document.getElementById('note-'+note.id)||noteCard(note,index);
+  if(list.children[index]!==card)list.insertBefore(card,list.children[index]||null);
+  card.classList.toggle('copied',copied.has(note.id));card.classList.toggle('compact',view==='compact');
+  card.querySelector('.note-label')!.textContent=`Note ${String(index+1).padStart(2,'0')}`;
+  card.querySelector('.danger')!.setAttribute('aria-label',`Delete Note ${String(index+1).padStart(2,'0')}`);
+  card.querySelector('.note-copy')!.textContent=copied.has(note.id)?'Copied ✓':'Copy';
+  const expand=card.querySelector<HTMLButtonElement>('.expand')!;expand.hidden=view!=='compact';expand.textContent=expanded.has(note.id)?'Collapse':'Expand';expand.setAttribute('aria-expanded',String(expanded.has(note.id)));
+  card.querySelector<HTMLElement>('.note-text')!.hidden=view==='compact'&&!expanded.has(note.id);
+ });updateSummary();
 }
 function schedule(){clearTimeout(poll);if(config)poll=setTimeout(()=>void refresh(),live&&reachable?15000:4000);}
 async function refresh(){
@@ -77,8 +101,9 @@ async function copyNote(note:Note,advance:boolean){
  const success=await copyExact(note.text);if(g!==generation)return;
  if(!success){message('Copy was blocked. Select the note and press Ctrl+C. Your note is still here.');return;}
  copied.add(note.id);saveCopied();renderNotes();message('Copied ✓ Ready to paste.');
- if(advance){const next=nextNote(notes,copied);if(next){const card=$('note-'+next.id);card.focus({preventScroll:true});card.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'center'});}else message('All notes copied ✓ Clear them when you are ready.');}
+ if(advance){const next=nextNote(notes,copied);if(next)focusNote(next.id);else message('All notes copied ✓ Clear them when you are ready.');}
 }
+function focusNote(id:string){selectedId=id;const card=$('note-'+id);card?.focus({preventScroll:true});card?.scrollIntoView({behavior:'instant',block:'nearest'});}
 function confirm(title:string,description:string,label:string,action:()=>Promise<void>){
  $('confirm-title').textContent=title;$('confirm-text').textContent=description;const b=$<HTMLButtonElement>('confirm-action');b.textContent=label;b.disabled=false;
  b.onclick=async()=>{b.disabled=true;try{await action();$<HTMLDialogElement>('confirmation').close();}catch(e){message(e instanceof Error?e.message:'Unable to clear. Please retry.');}finally{b.disabled=false;}};
@@ -91,16 +116,30 @@ async function openFile(file:RelayFile,download=false){
  try{const url=await signed(file,download?'download':'open');if(download){const link=document.createElement('a');link.href=url;link.rel='noreferrer';link.download='';link.click();}else if(tab)tab.location.replace(url);else message('Allow this site to open a new tab, then try again.');}
  catch(e){tab?.close();message(e instanceof Error?e.message:'Unable to open file.');}
 }
+function closePreview(){previewId='';$<HTMLDialogElement>('file-preview').close();$('preview-content').replaceChildren();$('preview-name').textContent='';}
+async function previewFile(file:RelayFile){
+ const g=generation;previewId=file.id;$('preview-name').textContent=file.name;$('preview-content').textContent='Loading preview…';$<HTMLDialogElement>('file-preview').showModal();
+ $('preview-download').onclick=()=>void openFile(file,true);
+ try{
+  const url=await signed(file,'preview');if(g!==generation||previewId!==file.id)return;
+  const content=$('preview-content');content.replaceChildren();
+  if(file.mime==='application/pdf'&&navigator.pdfViewerEnabled){const frame=document.createElement('iframe');frame.title='PDF preview';frame.referrerPolicy='no-referrer';frame.src=url;content.append(frame);}
+  else if(file.mime.startsWith('image/')){const img=document.createElement('img');img.alt=file.name;img.src=url;img.referrerPolicy='no-referrer';img.onerror=()=>{content.textContent='Preview is unavailable in this browser. Download the file to view it.';};content.append(img);}
+  else{content.textContent='Preview is unavailable in this browser. ';const open=document.createElement('button');open.textContent='Open in browser';open.onclick=()=>void openFile(file);content.append(open);}
+ }catch{if(previewId===file.id)$('preview-content').textContent='Unable to load preview. Close and try again.';}
+}
 function renderFiles(){
  files=files.filter(f=>Date.parse(f.expires_at)>now());$('file-count').textContent=String(files.length);$('empty-files').hidden=!!files.length;$<HTMLButtonElement>('delete-files').disabled=!files.length;
+ if(previewId&&!files.some(f=>f.id===previewId))closePreview();
  const key=files.map(f=>f.id).join(',');if(key===filesKey)return;filesKey=key;for(const observer of thumbnailObservers)observer.disconnect();thumbnailObservers.clear();$('files').replaceChildren();const g=generation;
  for(const file of files){
   const row=document.createElement('article');row.className='file';const icon=document.createElement('div');icon.className='file-icon';icon.textContent=file.mime==='application/pdf'?'PDF':file.mime.split('/')[1].toUpperCase();
   const details=document.createElement('div'),name=document.createElement('p');name.className='file-name';name.textContent=file.name;
-  const meta=document.createElement('p');meta.className='file-meta';meta.textContent=`${size(file.size)} · ${file.source} · ${time(file.created_at)}`;
-  const exp=document.createElement('span');exp.dataset.expires=file.expires_at;exp.textContent=expiry(file.expires_at);meta.append(document.createElement('br'),exp);details.append(name,meta);
+  const meta=document.createElement('p');meta.className='file-meta';meta.textContent=`${size(file.size)}${file.source?' · '+file.source:''}`;
+  const received=document.createElement('span');received.textContent='Received '+time(file.created_at);
+  const exp=document.createElement('span');exp.dataset.expiryAbsolute=file.expires_at;exp.textContent=expiryLabel(file.expires_at,now());meta.append(document.createElement('br'),received,document.createElement('br'),exp);details.append(name,meta);
   const actions=document.createElement('div');actions.className='file-actions';
-  const callbacks:[string,()=>void][]=[['Open',()=>void openFile(file)],['Download',()=>void openFile(file,true)],['Link',()=>{void signed(file,'download').then(async url=>message(await copyExact(url)?'Link copied. It expires in 60 seconds.':'Copy was blocked.')).catch(()=>message('Unable to create link.'));}],['Delete',()=>confirm('Delete this file?','It will be removed from the inbox. This cannot be undone.','Delete',async()=>{await request('/delete-files',{ids:[file.id]});await refresh();})]];
+  const callbacks:[string,()=>void][]=[['Preview',()=>void previewFile(file)],['Download',()=>void openFile(file,true)],['Delete',()=>confirm('Delete this file?','It will be removed from the inbox. This cannot be undone.','Delete',async()=>{await request('/delete-files',{ids:[file.id]});await refresh();})]];
   for(const[label,fn]of callbacks){const b=document.createElement('button');b.className='text-button'+(label==='Delete'?' danger':'');b.textContent=label;b.setAttribute('aria-label',`${label} ${file.name}`);b.onclick=fn;actions.append(b);}row.append(icon,details,actions);$('files').append(row);
   if(file.mime.startsWith('image/')){
    // Mint the short-lived URL when the card approaches the viewport, so lazy
@@ -141,16 +180,29 @@ $('sort').onchange=()=>renderNotes();
 $('clear-copied').onclick=()=>{const ids=notes.filter(n=>copied.has(n.id)).map(n=>n.id);confirm(`Clear ${ids.length} copied ${ids.length===1?'note':'notes'}?`,'Only the notes already marked as copied will be deleted. New arrivals are kept.','Clear copied',()=>deleteNotes(ids));};
 $('clear-all').onclick=()=>{const ids=notes.map(n=>n.id);confirm(`Clear all ${ids.length} notes?`,'These notes will be permanently removed. Files and notes arriving after this confirmation opens are kept.','Clear all',()=>deleteNotes(ids));};
 $('delete-files').onclick=()=>{const ids=files.map(f=>f.id);confirm(`Delete all ${ids.length} files?`,'These files will be removed. Notes are kept.','Delete all',async()=>{await request('/delete-files',{ids});await refresh();});};
-$('lock').onclick=async()=>{try{await request('/lock',{});hideWorkspace();}catch{hideWorkspace('The screen is locked locally. Server lock could not be confirmed; close this browser if shared.');}};
+$('lock').onclick=async()=>{hideWorkspace();$<HTMLButtonElement>('unlock').disabled=true;try{await request('/lock',{});$<HTMLButtonElement>('unlock').disabled=false;$('code').focus();}catch{hideWorkspace('The screen is locked locally. Server lock could not be confirmed; close this browser if shared.');}};
 const input=$<HTMLInputElement>('file-input');$('choose').onclick=()=>input.click();input.onchange=()=>{queueFiles(Array.from(input.files||[]));input.value='';};
 const drop=$('drop');for(const event of ['dragenter','dragover'])drop.addEventListener(event,e=>{e.preventDefault();drop.classList.add('drag');});for(const event of ['dragleave','drop'])drop.addEventListener(event,e=>{e.preventDefault();drop.classList.remove('drag');});drop.addEventListener('drop',e=>queueFiles(Array.from((e as DragEvent).dataTransfer?.files||[])));
-document.addEventListener('paste',e=>{if(!config)return;const images=Array.from(e.clipboardData?.items||[]).filter(i=>i.kind==='file'&&i.type.startsWith('image/')).map(i=>i.getAsFile()).filter((f):f is File=>!!f);if(images.length){e.preventDefault();queueFiles(images,true);}});
+document.addEventListener('paste',e=>{if(!config||typing(e.target))return;const images=Array.from(e.clipboardData?.items||[]).filter(i=>i.kind==='file'&&i.type.startsWith('image/')).map(i=>i.getAsFile()).filter((f):f is File=>!!f).map((f,i)=>new File([f],`Screenshot-${new Date().toISOString().replace(/[:.]/g,'-')}-${i+1}.${f.type.split('/')[1]||'png'}`,{type:f.type}));if(images.length){e.preventDefault();queueFiles(images,true);}});
+$<HTMLSelectElement>('theme').value=theme;$('theme').onchange=()=>{theme=$<HTMLSelectElement>('theme').value;persist('relay-v3-theme',theme);applyTheme();};
+$<HTMLSelectElement>('view').value=view;$('view').onchange=()=>{view=$<HTMLSelectElement>('view').value;persist('relay-v3-view',view);renderNotes();};
+$('preview-close').onclick=closePreview;$<HTMLDialogElement>('file-preview').addEventListener('cancel',()=>closePreview());
+$('show-shortcuts').onclick=()=>$<HTMLDialogElement>('shortcuts').showModal();$('close-shortcuts').onclick=()=>$<HTMLDialogElement>('shortcuts').close();
+document.addEventListener('keydown',e=>{
+ if(!config||typing(e.target)||e.ctrlKey||e.metaKey||e.altKey||document.querySelector('dialog[open]'))return;
+ const shown=ordered(notes,$<HTMLSelectElement>('sort').value==='newest');if(!shown.length)return;
+ const index=shown.findIndex(n=>n.id===selectedId),key=e.key.toLowerCase();
+ if(key==='c'){e.preventDefault();const note=nextNote(notes,copied);if(note)void copyNote(note,true);}
+ else if(['j','arrowdown','k','arrowup'].includes(key)){e.preventDefault();const next=['j','arrowdown'].includes(key)?Math.min(shown.length-1,index+1):Math.max(0,index-1);focusNote(shown[next].id);}
+ else if(key==='enter'&&!(e.target as Element).closest('button,a')){e.preventDefault();void copyNote(shown[Math.max(0,index)],false);}
+});
 window.addEventListener('online',()=>void refresh());window.addEventListener('offline',()=>{reachable=false;setStatus();});document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});
 window.addEventListener('pagehide',()=>{for(const c of controllers)c.abort();$('notes').replaceChildren();$('files').replaceChildren();notes=[];files=[];});window.addEventListener('pageshow',e=>{if(e.persisted){revision=-1;filesKey='';void refresh();}});
 window.addEventListener('storage',e=>{if(e.key===COPIED_KEY){try{copied=new Set(JSON.parse(e.newValue||'[]'));renderNotes();}catch{}}});
 setInterval(()=>{
  if(!config)return;if(Date.parse(config.expires_at)<=Date.now()){hideWorkspace('Session expired. Open your saved receiver URL to continue.');return;}
- const active=activeNotes(notes,now());if(active.length!==notes.length){notes=active;renderNotes();}renderFiles();document.querySelectorAll<HTMLElement>('[data-expires]').forEach(el=>el.textContent=expiry(el.dataset.expires!));
+ const active=activeNotes(notes,now());if(active.length!==notes.length){notes=active;renderNotes();}renderFiles();document.querySelectorAll<HTMLElement>('[data-expires]').forEach(el=>{const label=expiry(el.dataset.expires!);if(el.textContent!==label)el.textContent=label;});
+ document.querySelectorAll<HTMLElement>('[data-expiry-absolute]').forEach(el=>{const label=expiryLabel(el.dataset.expiryAbsolute!,now());if(el.textContent!==label)el.textContent=label;});
 },1000);
 async function boot(){
  try{

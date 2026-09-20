@@ -4,11 +4,15 @@ Only synthetic data was used. Tests target the new V3 namespace and preview.
 
 ## Automated results
 
-- 11 local unit tests: cryptographic round-trip, exact UTF-8/whitespace, malformed/tampered envelopes, freshness/protocol, file encryption, byte validation and size bounds, stream limits, ordering, independent expiry and copy selection, client-derived metadata.
+- 23 local unit tests: cryptographic round-trip, exact UTF-8/whitespace, malformed/tampered envelopes, freshness/protocol, file encryption, byte validation and size bounds, ordering/expiry/copy selection, patient preview, theme/view preferences, remaining count, expiry labels, minimal MCP schema, sender acknowledgement validation, lost-response retries and nonce receipt recovery.
 - 22 live integration checks: [machine-readable report](../tests/live-results.json).
+- 9 live OAuth/MCP/sender checks: [report](../tests/sender-live-results.json). These exercise real deployed endpoints, not ChatGPT model selection; actual ChatGPT acceptance is recorded separately.
+- Real new Trackcare conversation: [acceptance evidence](CHATGPT_ACCEPTANCE.md), [metadata report](../tests/chatgpt-acceptance-results.json). Phrase-only sends A and B both appended, kept existing items and returned exactly the required Arabic acknowledgement, without a per-send prompt in the final run.
 - Additional compatibility checks: [report](../tests/compatibility-results.json): concurrent duplicate requests insert once, GET re-fetch returns the same receipt, maximum 64 KiB note, and actual signed URL expiration after waiting its full lifetime.
 - Full live desktop/mobile browser workflow: [report](../tests/browser-results.json), with screenshots in `v3/artifacts/`. This is one Playwright scenario containing the individual assertions listed below.
-- Actual TinyFish `fetch_content` with `ttl=0`: encrypted GET accepted one synthetic note; repeated underlying fetch returned its original acknowledgement with `replayed:true` and no second note. This tests TinyFish transport, not the user's phone project configuration.
+- Added live polish browser scenario: [report](../tests/polish-browser-results.json), covering compact/theme persistence, exact Copy next counts and focus, clear confirmation count, keyboard/input safety, file metadata, preview, screenshot paste, twenty-note performance and server session destruction on Lock.
+- Added native Chrome PDF scenario using a real generated PDF. The built-in browser viewer rendered the document within Relay's modal; screenshot inspected. Browsers without PDF support receive the explicit fallback.
+- Previous delivery's TinyFish encrypted GET evidence remains compatibility history. Normal ChatGPT sending now uses the authenticated MCP sender and POST, without TinyFish.
 - TypeScript typecheck/build and `npm audit --omit=dev` passed; dependency audit reported zero vulnerabilities.
 
 ## Requested acceptance coverage
@@ -42,16 +46,16 @@ Only synthetic data was used. Tests target the new V3 namespace and preview.
 | 25 | Signed URL expiry | Expired/tampered capability checks; actual issued link stops working at deadline |
 | 26 | File cleanup | Unattended physical Storage deletion after synthetic expiry |
 
-Additional checks: no browser exceptions, mobile/desktop horizontal overflow, decoded image thumbnails, no pairing/enrollment/save UI, HttpOnly/Secure/SameSite cookie, no session or patient data in local/session storage, no public table/RPC privileges, private bucket, legacy RPC revocations, cleanup schedule active, V1 production unchanged, V1/V2 function source hashes unchanged. Supabase revision counters advanced after adding V3 project secrets, without changing their source or existing secret values.
+Additional checks: no browser exceptions, mobile/desktop horizontal overflow, decoded image thumbnails, no pairing/enrollment/save UI, HttpOnly/Secure/SameSite cookie, only anonymous note IDs and UI preferences in localStorage, empty sessionStorage, no public table/RPC privileges, private bucket, legacy RPC revocations, both cleanup schedules active, V1 production unchanged, V1/V2 function source hashes unchanged. This sender/polish update added no secrets and deployed only relay-v3 and the V3 preview alias.
 
 ## Measured observations
 
-Initial complete live run: Realtime delivery approximately 4.2 seconds; fallback arrival approximately 6.5 seconds end-to-end (includes encrypted send, polling cadence and response). Polling is scheduled every four seconds after the prior HTTP request. Unattended note/file deletion occurred approximately 50.8 seconds after synthetic expiry.
+Current full regression: Realtime delivery approximately 3.6 seconds; fallback arrival approximately 7.0 seconds end-to-end (includes encrypted send, polling cadence and response). Polling is scheduled every four seconds after the prior HTTP request. The live test observed unattended physical cleanup after accelerated expiry; no manual cleanup invocation was needed. The polish report records twenty-note sort latency from its latest run.
 
-The twelve-hour default is asserted from actual accepted records; accelerated synthetic expiry exercises hiding and physical cleanup. This run has not waited twelve wall-clock hours. Browser Clipboard API arguments are verified character-for-character. Windows and the destination hospital application can normalize line endings independently. Physical phone/project invocation and hospital-network/paste acceptance remain owner-side checks.
+The twelve-hour default is asserted from actual accepted records; accelerated synthetic expiry exercises hiding and physical cleanup. This run has not waited twelve wall-clock hours. Browser Clipboard API arguments are verified character-for-character. Windows and the destination hospital application can normalize line endings independently. The user confirmed the existing V3 receiver works on the real hospital workstation. Native phone app tool availability and the updated UI on that physical workstation have not been tested by this run.
 
 ## Rerunning
 
-Run from `v3`: `npm test`, `npm run typecheck`, `npm run build`, `npx tsx scripts/live-tests.ts`, `npx tsx scripts/compatibility-tests.ts`, `npx playwright test`.
+Run from `v3`: `npm test`, `npm run typecheck`, `npm run build`, `npx tsx scripts/live-tests.ts`, `npx tsx scripts/compatibility-tests.ts`, `npx tsx scripts/sender-live-tests.ts`, `npx playwright test`, `npx tsx scripts/check-release.ts`, `npx tsx scripts/check-secrets.ts`. Run live suites serially because push versions are globally monotonic. The native PDF scenario requires installed Chrome.
 
-Use a dedicated empty V3 test inbox. The browser scenario clears all visible notes/files as part of acceptance. Never run it against clinical content. Runtime/service credentials must be supplied privately outside Git. Test traces/videos are disabled; screenshots contain only explicitly synthetic fixtures.
+Browser scenarios now filter their view to explicitly owned synthetic IDs and delete only those IDs, so unrelated inbox items remain. Runtime/service credentials must be supplied privately outside Git. Test traces/videos are disabled; screenshots contain only synthetic fixtures. The separate historical `acceptance-preview.ts` script still requires an empty inbox and is not part of routine regression.

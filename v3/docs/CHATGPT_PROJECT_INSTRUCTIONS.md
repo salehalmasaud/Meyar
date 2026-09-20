@@ -1,69 +1,52 @@
-# ChatGPT V3 sender
+# Trackcare Project Instructions
 
-Use a separate V3 test project/configuration until the current working V1 sender is deliberately switched. These instructions contain no encryption/signing credentials. They describe behavior; they cannot install a missing sender tool or give an unavailable runtime access to secrets.
+**Installed and tested on September 20, 2026.** This exact block is saved under `TRACKCARE RELAY V3 — SENDER` in the actual Trackcare Project Instructions. Existing clinical instructions were preserved; the obsolete Relay encryption/TinyFish paragraph was removed. No manual web connection step remains for this account. The app is [Trackcare Relay V3](https://chatgpt.com/plugins/plugin_asdk_app_6aaf9c4a1a488191ad3ee8a05b75df02). See [actual new-conversation acceptance](CHATGPT_ACCEPTANCE.md).
 
-## Paste these exact Project Instructions
-
-```text
-Trackcare Relay V3 is my temporary note inbox for the hospital workstation.
-
-When I say “ارسلها للدوام”, append the latest clearly identified FINAL Dietitian Note from this conversation to Trackcare Relay V3 using the configured protected sender. Send exactly one note for each explicit request. If no final note can be identified, ask which note to send. Never invent patient content.
-
-Preserve the complete note exactly: every character, space, indentation, blank line, line break, Unicode character and bullet. Do not prepend or append greetings, explanations, timestamps, Markdown fences or clinical changes. Do not shorten the note.
-
-Destination: https://trackcare-relay-v3--trackcare-relay.netlify.app/push-note-v3
-
-Prefer the configured encrypted POST sender. It reads V3 AES-256-GCM and independent HMAC-SHA256 credentials from its protected runtime environment, generates a fresh timestamp, nonce and IV, and assigns a strictly increasing version. Never put those credentials in Project Instructions, chat, frontend code, GitHub, or URLs. The viewer PIN 000 is never a sender credential.
-
-If the configured integration requires TinyFish fetch_content, use only its pre-generated V3 encrypted GET envelope URL. The URL must contain ciphertext and authentication metadata only, never plaintext note content. Use ttl=0. Do not use TinyFish browser automation, any other browser automation, GitHub writes or deployment tools to send a note. Do not open the receiver manually or perform device pairing.
-
-Confirm “تم إرسال الملاحظة للدوام.” only after the endpoint returns ok:true with a matching version and note ID, or after an authenticated replay acknowledgement confirms the same envelope already arrived. Notes accumulate; never replace, edit, clear or delete existing notes after sending.
-
-If delivery is uncertain because of a timeout, retry the identical encrypted envelope once. Do not generate a new envelope/version merely to force a retry, because that could create another note. A 409 response counts as acknowledged only when error is replayed, accepted_id is present and version matches the submitted envelope. Other 409 responses are failures requiring investigation. Do not claim success from a fetch tool's outer HTTP success if the enclosed endpoint result is not a valid acknowledgement.
-
-If sending fails, say “تعذر الإرسال؛ لم يتأكد وصول الملاحظة إلى Relay.” If no protected sender/encryption runtime is connected, say “تكامل الإرسال إلى V3 غير متصل في هذه المحادثة.” Never pretend the instructions alone sent it and never silently switch to V1 or V2.
-
-The receiver opens one saved private URL and enters 000. Notes are read-only, shown oldest first, and each expires independently 12 hours after receipt. Copy does not delete. No device enrollment, invitation, synchronization, permanent history or backup is part of this workflow.
-```
-
-## Exact wire contract
-
-Endpoint: `POST https://trackcare-relay-v3--trackcare-relay.netlify.app/push-note-v3`
-
-Content-Type: `application/json`
-
-Fields only:
-
-| Field | Value |
-|---|---|
-| protocol | `3` |
-| version | positive safe integer, strictly increasing epoch milliseconds |
-| timestamp | current epoch milliseconds; within ±120 seconds of server time |
-| nonce | 24 cryptographically random bytes, unpadded canonical base64url |
-| iv | 12 random bytes, unpadded canonical base64url |
-| ciphertext | AES-256-GCM ciphertext followed by 16-byte tag, base64url |
-| signature | HMAC-SHA256, 32 bytes, base64url |
-
-AES additional authenticated data, UTF-8, literal LF separators:
+For recovery or another authorized account, connect the app first and then add the block below. Instructions alone do not install a tool.
 
 ```text
-relay-v3\n{version}\n{timestamp}\n{nonce}
+When I say "ارسلها للدوام", call the Trackcare Relay V3 app's send_note tool with exactly one argument:
+{"note":"<the exact latest final Dietitian Note in this conversation>"}
+
+Send the complete final note exactly as it was generated, preserving every character, space, indentation, blank line and line break. Do not rewrite, summarize, add a heading, add commentary, add Markdown fences, or add a timestamp. If the note is displayed inside a code block, send its contents without the Markdown fence. If no final note is clearly identifiable, ask which note to send.
+
+Call send_note once per explicit send request. The tool appends to the V3 inbox and keeps all existing notes. Do not call any tool to edit, replace, delete or clear inbox items.
+
+Only after send_note returns success:true with a note_id and version, reply with exactly:
+تم الإرسال للدوام.
+
+Do not add anything to that successful reply.
+
+The sender service handles encryption, signing and transport. Never ask for, retrieve, calculate, display or transmit encryption keys, HMAC secrets, viewer secrets, gateway secrets or database credentials. Do not use TinyFish, browser automation, GitHub writes, deployments, a manual sender webpage, or V1/V2 as an alternative sending method.
+
+If the tool is not available, say: "تكامل الإرسال إلى V3 غير متصل في هذه المحادثة."
+If the tool fails or delivery is uncertain, say: "تعذر الإرسال؛ لم يتأكد وصول الملاحظة إلى Relay."
+Never claim success without the tool receipt. Never make a fresh tool call simply to resolve an uncertain timeout; transport retries of the same request are handled by the sender without duplication.
+
+Notes are read-only and expire independently 12 hours after receipt. Copying does not delete a note. The private receiver bookmark and PIN 000 belong to the viewer workflow and are never sender credentials.
 ```
 
-HMAC input: the above AAD + `\n{iv}\n{ciphertext}`. AES key and HMAC key are independent 32-byte V3 secrets. Do not reuse V1/V2 keys. The note is the exact plaintext, maximum 65,536 UTF-8 bytes. There is no client-specified retention or patient metadata field.
+## Private ChatGPT connection
 
-Temporary encrypted GET compatibility:
+- Name: **Trackcare Relay V3**
+- Server URL: **https://trackcare-relay-v3--trackcare-relay.netlify.app/mcp**
+- Transport: Streamable HTTP (JSON responses)
+- Authentication: **OAuth**
+- Client ID / Client secret: leave empty; dynamic registration is supported.
+- Scope: **notes.write** (discovered automatically; enter only if the UI asks).
+- Authorization / Token URL overrides: leave empty; metadata supplies them.
+- Allowed callback: **https://chatgpt.com/connector_platform_oauth_redirect**
+- Tool: **send_note**, a write action with only the required string parameter **note**.
 
-```text
-GET /push-note-v3?envelope={base64url(UTF8(JSON(envelope)))}
-```
+Current web UI, inspected September 20, 2026:
 
-Maximum entire query string: 7,000 characters. Oversized notes must use POST; do not split one note into multiple cards or fall back to plaintext URLs. Identical GET re-fetches return the original success receipt with `replayed:true` and do not append again. This accommodates `fetch_content` performing multiple fetches. POST replay remains HTTP 409 with `accepted_id`. Disable GET with `RELAY_V3_ALLOW_GET_PUSH=false` after POST compatibility is established.
+1. In ChatGPT open **Plugins** (https://chatgpt.com/plugins), choose **Add → Create MCP App**. If that option is unavailable, enable Developer mode in **Settings → Security and login** first.
+2. Enter the name and Server URL above; choose OAuth. Leave Advanced OAuth settings empty.
+3. Review the trust notice, then Create. Complete the OAuth connection.
+4. On the Relay consent page, first open the existing private receiver bookmark in another tab of the same browser and enter **000**. Return to the consent page and select **Allow sending notes**. It grants append-only access; no read/delete tool is exposed.
+5. Add the instructions above to Trackcare. Start a **new** Trackcare conversation and enable/select the new app if it is not already available.
+6. Generate **Test Note Sender A**, then say **ارسلها للدوام**. Verify the tool call, exact Arabic response and appended note. Repeat with **Test Note Sender B**. Both must coexist with existing items.
 
-Reference implementation: `v3/server/core.ts` and `v3/scripts/push-note.ts`. The latter accepts exact UTF-8 on stdin, reads the private runtime environment, uses POST, retries the same envelope once and outputs acknowledgement metadata only. Serialize sends in that runtime so versions strictly increase; retain an uncertain envelope for resolution before accepting a new send. Do not pass note text in shell command arguments.
+ChatGPT's write-action confirmations and app availability are controlled by ChatGPT. Do not mislabel this action as read-only to bypass them. Official documentation currently describes developer-mode access on the web and says new conversations may ask for confirmation again. The final web acceptance conversation sent both A and B automatically with no per-send prompt. Native phone availability still requires real device testing.
 
-Required protected sender values: `RELAY_V3_ENCRYPTION_SECRET`, `RELAY_V3_PUSH_HMAC_SECRET`, and the public V3 endpoint/origin. All other secrets, particularly the viewer, gateway, service-role and file-link secrets, are unnecessary for a sender.
-
-## Actual project connection
-
-The preview endpoint is deployed and tested, including an actual encrypted TinyFish `fetch_content` invocation that appended one synthetic note and returned its receipt. The current phone ChatGPT project's protected sender configuration is not present in the repository. A request was made for its integration name/configuration location without requesting secret values. A working phrase-to-tool invocation on the phone must be verified in that project; backend, browser, and TinyFish transport tests do not establish that connection automatically. Do not change the existing V1 sender while this connection is unresolved.
+Sources: [Connect from ChatGPT](https://developers.openai.com/plugins/deploy/connect-chatgpt), [OAuth](https://developers.openai.com/plugins/build/auth), [Developer mode](https://developers.openai.com/api/docs/guides/developer-mode).
