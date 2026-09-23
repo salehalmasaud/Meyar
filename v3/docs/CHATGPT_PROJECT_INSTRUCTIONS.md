@@ -24,6 +24,8 @@ If the tool fails or delivery is uncertain, say: "تعذر الإرسال؛ لم
 Never claim success without the tool receipt. Never make a fresh tool call simply to resolve an uncertain timeout; transport retries of the same request are handled by the sender without duplication.
 
 Notes are read-only and expire independently 12 hours after receipt. Copying does not delete a note. The private receiver bookmark and PIN 000 belong to the viewer workflow and are never sender credentials.
+
+When I ask to retrieve a file from Relay, for example “هات p30”, use list_files with the filename or part of it, then get_file with the selected file_id. File retrieval is read-only. Do not delete, rename, replace, or otherwise change Relay files. If several active files match, identify the matches before choosing one.
 ```
 
 ## Private ChatGPT connection
@@ -33,10 +35,10 @@ Notes are read-only and expire independently 12 hours after receipt. Copying doe
 - Transport: Streamable HTTP (JSON responses)
 - Authentication: **OAuth**
 - Client ID / Client secret: leave empty; dynamic registration is supported.
-- Scope: **notes.write** (discovered automatically; enter only if the UI asks).
+- Scopes: **notes.write** and **files.read** (discovered automatically; enter only if the UI asks).
 - Authorization / Token URL overrides: leave empty; metadata supplies them.
 - Allowed callback: **https://chatgpt.com/connector_platform_oauth_redirect**
-- Tool: **send_note**, a write action with only the required string parameter **note**.
+- Tools: **send_note** (write), **list_files** (read-only), and **get_file** (read-only). File tools use the separate **files.read** scope.
 
 Current web UI, inspected September 20, 2026:
 
