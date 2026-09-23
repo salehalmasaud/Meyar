@@ -165,7 +165,7 @@ export function createConnector(c:Settings,db:Store){
       if(path==='/.well-known/oauth-authorization-server'&&req.method==='GET'){
         return json({
           issuer:base,
-          authorization_endpoint:base+'/connect.html',
+          authorization_endpoint:base+'/oauth/consent',
           token_endpoint:base+'/oauth/token',
           registration_endpoint:base+'/oauth/register',
           revocation_endpoint:base+'/oauth/revoke',
@@ -176,6 +176,11 @@ export function createConnector(c:Settings,db:Store){
           scopes_supported:supportedScopes,
           authorization_response_iss_parameter_supported:true
         });
+      }
+
+      if(path==='/oauth/consent'&&req.method==='GET'){
+        const html='<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Connect ChatGPT · Trackcare Relay</title><link rel="stylesheet" href="/app.css"><script type="module" src="/connect.js"></script></head><body><main><section class="gate"><p class="eyebrow">TRACKCARE RELAY</p><h1>Connect ChatGPT</h1><p class="gate-description">Allow ChatGPT to append notes and retrieve files you explicitly ask for from your temporary inbox. This connection cannot change or delete existing notes or files.</p><p>First open your saved private receiver bookmark and enter 000 in this browser. Then return here.</p><button id="connect" class="primary">Allow Relay access</button><p id="result" role="status"></p><p class="gate-foot">You can disconnect this app in ChatGPT settings.</p></section></main></body></html>';
+        return new Response(html,{status:200,headers:{...headers,'content-type':'text/html; charset=utf-8'}});
       }
 
       const ip=await hmac(c.rate,'oauth-ip.'+(req.headers.get('x-relay-client')||'unknown'));
