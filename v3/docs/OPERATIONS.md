@@ -6,7 +6,7 @@
 - Preview only: `https://trackcare-relay-v3--trackcare-relay.netlify.app`.
 - One stable receiver URL: `%LOCALAPPDATA%\TrackcareRelay\v3\receiver-url.txt`. This is a private receiver bookmark, not a device invitation. Copy/bookmark the exact URL from that file, including its `#access=` fragment. Open it and enter `000`.
 - One public transport endpoint: `https://trackcare-relay-v3--trackcare-relay.netlify.app/push-note-v3`, authenticated by the encrypted envelope. The user never opens this manually.
-- Private ChatGPT app: **Trackcare Relay V3**, connected with OAuth to `https://trackcare-relay-v3--trackcare-relay.netlify.app/mcp`. Only `send_note({note})` is exposed. The actual Trackcare Project Instructions have been updated while preserving clinical instructions.
+- Private ChatGPT app: **Trackcare Relay V3**, connected with OAuth to `https://trackcare-relay-v3--trackcare-relay.netlify.app/mcp`. It exposes `send_note({note})` plus read-only `list_files({query?})` and `get_file({file_id})`. Existing send-only grants remain limited to `notes.write`; file retrieval requires the added `files.read` scope.
 - Independent backend: `relay-v3`, `relay_v3_*`, `relay-v3-private`, `relay-v3-expiry-sweep`.
 - Sender migration: `20260920103000_relay_v3_sender.sql`, five additive tables and `relay-v3-sender-expiry`. No note data migration or new wire protocol.
 - V3 private environment outside Git: `%LOCALAPPDATA%\TrackcareRelay\v3\.env`. Windows ACL restricts this directory to the owner and SYSTEM. No encryption/signing keys belong in Project Instructions.
@@ -22,7 +22,7 @@ Supabase secrets use only `RELAY_V3_*` names. Deploy only `relay-v3` with `--use
 - Viewer session: `RELAY_V3_SESSION_TTL_SECONDS=28800`; bounded to at most twelve hours.
 - Encrypted GET compatibility: `RELAY_V3_ALLOW_GET_PUSH=true`; retained for compatibility. The new ChatGPT app always sends via POST. Retiring legacy GET is a separate operational change.
 - File signed links: 60 seconds maximum.
-- OAuth: two-minute authorization code, one-hour access token, rotating refresh token valid for 30 days unused; fixed `notes.write` scope. No sender secret is copied into ChatGPT instructions or a URL.
+- OAuth: two-minute authorization code, one-hour access token, rotating refresh token valid for 30 days unused; scoped `notes.write` and `files.read` permissions. Existing pre-file-read grants remain `notes.write` only until reauthorized. No sender or file-encryption secret is copied into ChatGPT instructions or a URL.
 
 ## Migration plan
 
