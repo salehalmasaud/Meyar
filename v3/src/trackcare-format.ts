@@ -44,7 +44,7 @@ export function buildTrackcareHtml(text:string):string{
   let section:Section='top';
   let firstContent=true;
 
-  out.push("<div style=\"font-family:'Times New Roman',serif;font-size:12pt;color:#000000;line-height:1.0;background:#ffffff;\">");
+  out.push("<div style=\"font-family:'Times New Roman',serif;font-size:12pt;color:#000000;line-height:1.0;\">");
 
   for(const raw of lines){
     const trimmed=raw.trim();
