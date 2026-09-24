@@ -60,7 +60,7 @@ export const listFilesTool={
 export const getFileTool={
   name:'get_file',
   title:'Get Relay file',
-  description:'Retrieves one active file from the private Trackcare Relay V3 inbox by the file_id returned from list_files. Returns a short-lived private resource link for the file. This is read-only and never changes or deletes files.',
+  description:'Retrieves one active file from the private Trackcare Relay V3 inbox by the file_id returned from list_files. Returns a Relay resource that ChatGPT can read directly, with a short-lived download URL as fallback. This is read-only and never changes or deletes files.',
   inputSchema:{
     type:'object',
     properties:{file_id:{type:'string',description:'The Relay file ID returned by list_files.'}},
@@ -299,7 +299,7 @@ export function createConnector(c:Settings,db:Store){
             protocolVersion:['2024-11-05','2025-03-26','2025-06-18','2025-11-25'].includes(String(body?.protocolVersion))?body.protocolVersion:'2025-06-18',
             capabilities:{tools:{},resources:{}},
             serverInfo:{name:'trackcare-relay-v3',version:'3.2.0'},
-            instructions:'For an uploaded Relay file, call list_files with the filename or part of it, then call get_file with the selected file_id. File reads are read-only. Never delete or change Relay content.'
+            instructions:'For an uploaded Relay file, call list_files with the filename or part of it, then call get_file with the selected file_id. The returned relay:// resource is readable through resources/read and contains the actual image or PDF bytes. File reads are read-only. Never delete or change Relay content.'
           },{'mcp-session-id':session});
         }
 
