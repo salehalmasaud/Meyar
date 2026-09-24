@@ -1,4 +1,4 @@
-import {b64,decoder,decryptText,equalSecret,hash,hmac,randomToken,readJson,readLimited,RelayError,unb64,utf8,verifyHmac} from './core.ts';
+import {b64,decoder,decryptBytes,decryptText,equalSecret,hash,hmac,randomToken,readJson,readLimited,RelayError,unb64,utf8,verifyHmac} from './core.ts';
 import type {Settings} from './config.ts';
 import {Store,type FileRow} from './store.ts';
 import {sendNote} from './sender.ts';
@@ -297,13 +297,25 @@ export function createConnector(c:Settings,db:Store){
           const session=payload+'.'+await hmac(c.ticket,'mcp-session.'+payload);
           return result({
             protocolVersion:['2024-11-05','2025-03-26','2025-06-18','2025-11-25'].includes(String(body?.protocolVersion))?body.protocolVersion:'2025-06-18',
-            capabilities:{tools:{}},
+            capabilities:{tools:{},resources:{}},
             serverInfo:{name:'trackcare-relay-v3',version:'3.2.0'},
             instructions:'For an uploaded Relay file, call list_files with the filename or part of it, then call get_file with the selected file_id. File reads are read-only. Never delete or change Relay content.'
           },{'mcp-session-id':session});
         }
 
         if(b.method==='ping')return result({});
+        if(b.method==='resources/list')return result({resources:[]});
+        if(b.method==='resources/read'){
+          if(!hasScope(auth,fileScope))throw new RelayError(403,'insufficient_scope');
+          const params=b.params as {uri?:unknown};
+          if(typeof params?.uri!=='string')throw new RelayError(400,'invalid_request');
+          const match=/^relay:\/\/file\/([0-9a-f-]{36})$/.exec(params.uri);
+          if(!match||!UUID.test(match[1]))throw new RelayError(400,'invalid_request');
+          const row=await liveFile(match[1]);
+          const encrypted=new Uint8Array(await(await db.get(row.id,'data')).arrayBuffer());
+          const data=await decryptBytes(encrypted,c.encryption,'file-data-v3.'+row.id);
+          return result({contents:[{uri:params.uri,mimeType:row.mime,blob:b64(data)}]});
+        }
         if(b.method==='tools/list')return result({tools:[sendTool,listFilesTool,getFileTool]});
 
         if(b.method==='tools/call'){
@@ -369,7 +381,7 @@ export function createConnector(c:Settings,db:Store){
               return result({
                 structuredContent:{file},
                 content:[
-                  {type:'resource_link',uri,name:item.name,title:item.name,description:'Temporary private Trackcare Relay file. The link expires within 60 seconds.',mimeType:item.mime,size:item.size},
+                  {type:'resource_link',uri:'relay://file/'+row.id,name:item.name,title:item.name,description:'Private Trackcare Relay file available directly to ChatGPT through the Relay resource reader.',mimeType:item.mime,size:item.size},
                   {type:'text',text:'Retrieved Relay file: '+item.name}
                 ],
                 isError:false
