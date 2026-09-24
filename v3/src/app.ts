@@ -1,5 +1,5 @@
 import {RealtimeClient} from '@supabase/realtime-js';
-import {copyExact} from './clipboard.ts';
+import {copyForTrackcare} from './clipboard.ts';
 import {ordered,nextNote,metadata,activeNotes,remainingCount,expiryLabel,preference,type Note,type RelayFile} from './model.ts';
 const $=<T extends HTMLElement>(id:string)=>document.getElementById(id) as T;
 type Config={expires_at:string;text_ttl:number;file_ttl:number;realtime:{url:string;anon:string;topic:string}};
@@ -98,9 +98,10 @@ async function start(){
 }
 async function copyNote(note:Note,advance:boolean){
  const g=generation;if(Date.parse(note.expires_at)<=now())return;
- const success=await copyExact(note.text);if(g!==generation)return;
- if(!success){message('Copy was blocked. Select the note and press Ctrl+C. Your note is still here.');return;}
- copied.add(note.id);saveCopied();renderNotes();message('Copied ✓ Ready to paste.');
+ const copiedMode=await copyForTrackcare(note.text);if(g!==generation)return;
+ if(!copiedMode){message('Copy was blocked. Select the note and press Ctrl+C. Your note is still here.');return;}
+ copied.add(note.id);saveCopied();renderNotes();
+ message(copiedMode==='rich'?'Copied ✓ TrackCare formatting included.':'Copied ✓ Plain text fallback.');
  if(advance){const next=nextNote(notes,copied);if(next)focusNote(next.id);else message('All notes copied ✓ Clear them when you are ready.');}
 }
 function focusNote(id:string){selectedId=id;const card=$('note-'+id);card?.focus({preventScroll:true});card?.scrollIntoView({behavior:'instant',block:'nearest'});}
