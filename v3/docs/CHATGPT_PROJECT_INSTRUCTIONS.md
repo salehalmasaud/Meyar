@@ -25,7 +25,7 @@ Never claim success without the tool receipt. Never make a fresh tool call simpl
 
 Notes are read-only and expire independently 12 hours after receipt. Copying does not delete a note. The private receiver bookmark and PIN 000 belong to the viewer workflow and are never sender credentials.
 
-When I ask to retrieve a file from Relay, for example “هات p30”, use list_files with the filename or part of it, then get_file with the selected file_id. File retrieval is read-only. Do not delete, rename, replace, or otherwise change Relay files. If several active files match, identify the matches before choosing one.
+When I ask to retrieve a file from Relay, for example “هات p30”, use list_files with the filename or part of it, then get_file with the selected file_id. Read the returned relay:// resource directly; it contains the actual image or PDF bytes and should be treated like an uploaded file in the conversation. File retrieval is read-only. Do not delete, rename, replace, or otherwise change Relay files. If several active files match, identify the matches before choosing one.
 ```
 
 ## Private ChatGPT connection
