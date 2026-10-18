@@ -1,4 +1,4 @@
-import {b64,decoder,decryptBytes,decryptText,equalSecret,hash,hmac,randomToken,readJson,readLimited,RelayError,unb64,utf8,verifyHmac} from './core.ts';
+import {b64,decoder,decryptBytes,decryptText,equalSecret,hash,hmac,randomToken,readJson,readLimited,RelayError,mcpBlobBase64,unb64,utf8,verifyHmac} from './core.ts';
 import type {Settings} from './config.ts';
 import {Store,type FileRow} from './store.ts';
 import {sendNote} from './sender.ts';
@@ -60,7 +60,7 @@ export const listFilesTool={
 export const getFileTool={
   name:'get_file',
   title:'Get Relay file',
-  description:'Retrieves one active file from the private Trackcare Relay V3 inbox by the file_id returned from list_files. Returns a Relay resource that ChatGPT can read directly, with a short-lived download URL as fallback. This is read-only and never changes or deletes files.',
+  description:'Retrieves one active file from the private Trackcare Relay V3 inbox by the file_id returned from list_files. Returns an embedded PDF/image resource for files up to 2 MiB and a readable MCP resource for larger files. Signed download URLs expire in at most 60 seconds and must not be presented as durable download links. This is read-only and never changes or deletes files.',
   inputSchema:{
     type:'object',
     properties:{file_id:{type:'string',description:'The Relay file ID returned by list_files.'}},
@@ -299,7 +299,7 @@ export function createConnector(c:Settings,db:Store){
             protocolVersion:['2024-11-05','2025-03-26','2025-06-18','2025-11-25'].includes(String(body?.protocolVersion))?body.protocolVersion:'2025-06-18',
             capabilities:{tools:{},resources:{}},
             serverInfo:{name:'trackcare-relay-v3',version:'3.2.0'},
-            instructions:'For an uploaded Relay file, call list_files with the filename or part of it, then call get_file with the selected file_id. The returned relay:// resource is readable through resources/read and contains the actual image or PDF bytes. File reads are read-only. Never delete or change Relay content.'
+            instructions:'For an uploaded Relay file, call list_files with the filename or part of it, then call get_file with the selected file_id. The get_file result embeds image/PDF bytes for files up to 2 MiB. For larger files use resources/read on the relay:// URI. Never rely on the expiring download_url as a persistent chat attachment. File reads are read-only. Never delete or change Relay content.'
           },{'mcp-session-id':session});
         }
 
@@ -314,7 +314,7 @@ export function createConnector(c:Settings,db:Store){
           const row=await liveFile(match[1]);
           const encrypted=new Uint8Array(await(await db.get(row.id,'data')).arrayBuffer());
           const data=await decryptBytes(encrypted,c.encryption,'file-data-v3.'+row.id);
-          return result({contents:[{uri:params.uri,mimeType:row.mime,blob:b64(data)}]});
+          return result({contents:[{uri:params.uri,mimeType:row.mime,blob:mcpBlobBase64(data)}]});
         }
         if(b.method==='tools/list')return result({tools:[sendTool,listFilesTool,getFileTool]});
 
@@ -378,14 +378,20 @@ export function createConnector(c:Settings,db:Store){
               const signature=await hmac(c.link,'file-v3.'+row.id+'.'+exp+'.'+mode);
               const uri=c.url+'/functions/v1/relay-v3/file/'+row.id+'?expires='+exp+'&mode='+mode+'&signature='+signature;
               const file={...item,download_url:uri,link_expires_at:exp};
-              return result({
-                structuredContent:{file},
-                content:[
-                  {type:'resource_link',uri:'relay://file/'+row.id,name:item.name,title:item.name,description:'Private Trackcare Relay file available directly to ChatGPT through the Relay resource reader.',mimeType:item.mime,size:item.size},
-                  {type:'text',text:'Retrieved Relay file: '+item.name}
-                ],
-                isError:false
-              });
+              // Small files travel with the tool result, so ChatGPT does not
+              // have to hand the user a signed URL that expires within 60 s.
+              const relayUri='relay://file/'+row.id;
+              const content:Array<Record<string,unknown>>=[];
+              if(row.size<=2*1024*1024){
+                const encrypted=new Uint8Array(await(await db.get(row.id,'data')).arrayBuffer());
+                const bytes=await decryptBytes(encrypted,c.encryption,'file-data-v3.'+row.id);
+                content.push({type:'resource',resource:{uri:relayUri,mimeType:row.mime,blob:mcpBlobBase64(bytes)}});
+              }
+              content.push(
+                {type:'resource_link',uri:relayUri,name:item.name,title:item.name,description:'Private Relay file readable through resources/read. Signed download URLs are temporary.',mimeType:item.mime,size:item.size},
+                {type:'text',text:'Retrieved Relay file: '+item.name}
+              );
+              return result({structuredContent:{file},content,isError:false});
             }catch(e){
               return result({isError:true,content:[{type:'text',text:JSON.stringify({error:e instanceof RelayError?e.code:'temporarily_unavailable'})}]});
             }

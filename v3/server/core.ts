@@ -11,6 +11,11 @@ export function b64(bytes: Uint8Array): string {
   let result = ''; for (const b of bytes) result += String.fromCharCode(b);
   return btoa(result).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
+/** MCP binary resources require standard padded Base64; Relay tokens use Base64url. */
+export function mcpBlobBase64(bytes: Uint8Array): string {
+  const urlSafe=b64(bytes);
+  return urlSafe.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-urlSafe.length%4)%4);
+}
 export function unb64(s: unknown, max = MAX_ENVELOPE): Uint8Array<ArrayBuffer> {
   if (typeof s !== 'string' || !s.length || s.length > max || !/^[A-Za-z0-9_-]+$/.test(s)) throw new RelayError(400, 'invalid_request');
   try {

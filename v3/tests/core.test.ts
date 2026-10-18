@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {makeEnvelope,verifyEnvelope,decryptText,associatedData,randomToken,MAX_NOTE,MAX_FILE,sniffFile,encryptBytes,decryptBytes,hmac,signedData,b64,readLimited} from '../server/core.ts';
+import {makeEnvelope,verifyEnvelope,decryptText,associatedData,randomToken,MAX_NOTE,MAX_FILE,sniffFile,encryptBytes,decryptBytes,hmac,signedData,b64,mcpBlobBase64,readLimited} from '../server/core.ts';
 import {activeNotes,ordered,nextNote,metadata,type Note} from '../src/model.ts';
 const encryption=randomToken(),signing=randomToken();
 test('AES-GCM preserves every character, whitespace and Unicode',async()=>{const text='  Pt: synthetic\r\nDx: test\n\tالعربية\n\n ';const e=await makeEnvelope(text,encryption,signing);assert.deepEqual(await verifyEnvelope(e,encryption,signing),e);assert.equal(await decryptText(e,encryption,associatedData(e)),text);});
@@ -8,6 +8,7 @@ test('invalid ciphertext with valid signature rejected',async()=>{const e=await 
 test('timestamp and protocol enforcement',async()=>{const e=await makeEnvelope('test',encryption,signing);await assert.rejects(()=>verifyEnvelope(e,encryption,signing,Date.now()+121000),/expired_request/);await assert.rejects(()=>verifyEnvelope({...e,protocol:2},encryption,signing),/invalid_request/);});
 test('strict note size',async()=>{await assert.rejects(()=>makeEnvelope('x'.repeat(MAX_NOTE+1),encryption,signing),/too_large/);});
 test('file ciphertext authenticates and round trips',async()=>{const data=crypto.getRandomValues(new Uint8Array(100));const enc=await encryptBytes(data,encryption,'id');assert.notDeepEqual(enc,data);assert.deepEqual(await decryptBytes(enc,encryption,'id'),data);await assert.rejects(()=>decryptBytes(enc,encryption,'other-id'));});
+test('MCP binary file attachments use padded standard Base64',()=>{const bytes=Uint8Array.from([0xfb,0xff,0xfe,0x00,0xa1]);const encoded=mcpBlobBase64(bytes);assert.equal(encoded,'+//+AKE=');assert.equal(encoded,Buffer.from(bytes).toString('base64'));assert.deepEqual(Buffer.from(encoded,'base64'),Buffer.from(bytes));});
 test('file types are determined from bytes',()=>{assert.throws(()=>sniffFile(new TextEncoder().encode('<script>fake.png</script>')),/unsupported_file/);assert.throws(()=>sniffFile(new Uint8Array(MAX_FILE+1)),/too_large/);const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN2cAAAAASUVORK5CYII=','base64');assert.equal(sniffFile(png),'image/png');});
 test('request body stream limit enforced',async()=>{await assert.rejects(()=>readLimited(new Request('https://test',{method:'POST',body:'123456'}),5),/too_large/);});
 const note=(id:string,sequence:number,exp:number):Note=>({id,sequence,version:sequence,text:'test',received_at:new Date(0).toISOString(),expires_at:new Date(exp).toISOString()});
