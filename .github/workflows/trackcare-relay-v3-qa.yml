@@ -1,0 +1,35 @@
+name: Trackcare Relay V3 QA
+on:
+  push:
+    branches:
+      - trackcare-relay-v3-drive-handoff-20261018
+      - trackcare-relay-v3
+    paths:
+      - 'v3/**'
+      - '.github/workflows/trackcare-relay-v3-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  typecheck-test-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: v3/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests
+        run: npm test
+      - name: Build frontend
+        run: npm run build
