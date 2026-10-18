@@ -168,7 +168,7 @@ function queueFiles(incoming:File[],pasted=false){
   const row=document.createElement('div');row.className='queue-item';const name=document.createElement('span');name.className='queue-name';name.textContent=pasted?'Pasted image':file.name;
   const label=document.createElement('span');label.className='queue-status';label.textContent='Queued';const progress=document.createElement('progress');progress.max=100;progress.value=0;progress.setAttribute('aria-label','Upload progress');
   const retry=document.createElement('button');retry.textContent='Retry';retry.hidden=true;row.append(name,label,progress,retry);$('queue').append(row);
-  const run=async()=>{if(g!==generation)return;retry.hidden=true;if(file.size>20*1024*1024){label.textContent='Larger than 20 MB';return;}label.textContent='Uploading…';if(pasted)message('Pasted image — uploading…');
+  const run=async()=>{if(g!==generation)return;retry.hidden=true;if(file.size>20*1024*1024){label.textContent='Over 20 MB · use Google Drive below';retry.textContent='Open Drive';retry.onclick=()=>$<HTMLAnchorElement>('drive-link').click();retry.hidden=false;return;}label.textContent='Uploading…';if(pasted)message('Pasted image — uploading…');
    try{await upload(file,n=>{progress.value=n;label.textContent=n===100?'Uploaded ✓':n>=95?'Finishing…':`${n}%`;});if(g!==generation)return;message(pasted?'Pasted image — Uploaded ✓':'Uploaded ✓');await refresh();setTimeout(()=>row.remove(),4000);}
    catch(e){if(g!==generation)return;label.textContent=e instanceof Error?e.message:'Upload failed';retry.hidden=false;}
   };
