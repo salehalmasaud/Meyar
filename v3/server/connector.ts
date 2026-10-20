@@ -23,6 +23,7 @@ const fileItemSchema={
     name:{type:'string'},
     mime:{type:'string'},
     size:{type:'integer'},
+    large:{type:'boolean'},
     source:{type:'string'},
     created_at:{type:'string'},
     expires_at:{type:'string'}
@@ -77,6 +78,7 @@ export const getFileTool={
           name:{type:'string'},
           mime:{type:'string'},
           size:{type:'integer'},
+    large:{type:'boolean'},
           source:{type:'string'},
           created_at:{type:'string'},
           expires_at:{type:'string'},
@@ -144,7 +146,7 @@ export function createConnector(c:Settings,db:Store){
 
   async function fileItem(row:FileRow){
     const meta=await fileInfo(row.id);
-    return {id:row.id,name:meta.name,mime:row.mime,size:row.size,source:row.source,created_at:row.created_at,expires_at:row.expires_at};
+    return {id:row.id,name:meta.name,mime:row.mime,size:row.size,large:!!row.large,source:row.source,created_at:row.created_at,expires_at:row.expires_at};
   }
 
   async function liveFile(id:string){
@@ -312,6 +314,7 @@ export function createConnector(c:Settings,db:Store){
           const match=/^relay:\/\/file\/([0-9a-f-]{36})$/.exec(params.uri);
           if(!match||!UUID.test(match[1]))throw new RelayError(400,'invalid_request');
           const row=await liveFile(match[1]);
+          if(row.large)throw new RelayError(413,'large_file_browser_only');
           const encrypted=new Uint8Array(await(await db.get(row.id,'data')).arrayBuffer());
           const data=await decryptBytes(encrypted,c.encryption,'file-data-v3.'+row.id);
           return result({contents:[{uri:params.uri,mimeType:row.mime,blob:mcpBlobBase64(data)}]});
@@ -371,6 +374,7 @@ export function createConnector(c:Settings,db:Store){
             if(Object.keys(args).length!==1||typeof args.file_id!=='string')throw new RelayError(400,'invalid_request');
             try{
               const row=await liveFile(args.file_id);
+              if(row.large)return result({isError:true,content:[{type:'text',text:'Large file: open your private Trackcare Relay page from your laptop and use Download. The large file is not attached to ChatGPT.'}]});
               const item=await fileItem(row);
               const exp=Math.min(Date.now()+c.signedTtl*1000,Date.parse(row.expires_at));
               if(exp<=Date.now())throw new RelayError(404,'file_expired');

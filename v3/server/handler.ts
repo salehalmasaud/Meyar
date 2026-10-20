@@ -3,6 +3,7 @@ import type { Envelope } from './core.ts';
 import type { Settings } from './config.ts';
 import { Store,type NoteRow,type FileRow } from './store.ts';
 import {createConnector} from './connector.ts';
+import {LargeFiles} from './large.ts';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const validId=(v:unknown)=>{if(typeof v!=='string'||!UUID.test(v))throw new RelayError(400,'invalid_request');return v;};
 const current=()=>encodeURIComponent(new Date().toISOString());
@@ -13,6 +14,7 @@ export function createHandler(c:Settings,db=new Store(c)){
   const topic=hmac(c.link,'relay-v3-invalidation');
   const notify=async()=>db.broadcast('relay-v3-'+await topic);
   async function limit(key:string,count:number,seconds:number){if(!await db.rpc<boolean>('limit',{p_key:key,p_limit:count,p_seconds:seconds}))throw new RelayError(429,'try_later');}
+  const large=new LargeFiles(c,db,limit,notify);
   async function session(token:string,unlocked=true){
     if(!/^[A-Za-z0-9_-]{43}$/.test(token))throw new RelayError(401,'session_expired');
     const rows=await db.db<SessionRow[]>(`relay_v3_sessions?hash=eq.${await hash(token)}&expires_at=gt.${current()}`);
@@ -38,6 +40,8 @@ export function createHandler(c:Settings,db=new Store(c)){
       if(origin&&!c.origins.includes(origin))throw new RelayError(403,'unauthorized');
       if(action==='/mcp'||action.startsWith('/oauth/')||action.startsWith('/.well-known/'))return connector(req,action);
       if(req.method==='OPTIONS')return new Response(null,{status:204,headers:{...headers,'access-control-allow-methods':'GET,POST,OPTIONS','access-control-allow-headers':'authorization,content-type','access-control-max-age':'600'}});
+      if(action.startsWith('/large-chunk/')&&req.method==='POST')return json(await large.uploadChunk(req,action));
+      if(action.startsWith('/large-download/')&&req.method==='GET')return large.downloadChunk(action,url,headers);
       if(action==='/health'&&req.method==='GET')return json({ok:true,protocol:3,preview:true});
       if(action==='/sweep'&&req.method==='POST'){
         if(await db.rpc<boolean>('limit',{p_key:'sweeper',p_limit:2,p_seconds:60}))await cleanup();
@@ -71,6 +75,7 @@ export function createHandler(c:Settings,db=new Store(c)){
         const id=validId(action.slice(6)),expiry=Number(url.searchParams.get('expires')),mode=url.searchParams.get('mode');
         if(!Number.isSafeInteger(expiry)||expiry<=Date.now()||expiry>Date.now()+61000||!['open','download','preview'].includes(mode||'')||!await verifyHmac(c.link,`file-v3.${id}.${expiry}.${mode}`,url.searchParams.get('signature')||''))throw new RelayError(401,'link_expired');
         const row=await liveFile(id),meta=await fileInfo(id);
+        if(row.large)throw new RelayError(400,'large_file_browser_only');
         const data=await decryptBytes(new Uint8Array(await(await db.get(id,'data')).arrayBuffer()),c.encryption,'file-data-v3.'+id);
         return new Response(data as BodyInit,{headers:{...headers,'content-type':row.mime,'content-length':String(data.length),'content-disposition':`${mode==='download'?'attachment':'inline'}; filename="relay-file"; filename*=UTF-8''${encodeURIComponent(meta.name).replace(/[!'()*]/g,x=>'%'+x.charCodeAt(0).toString(16))}`,'content-security-policy':"sandbox; default-src 'none'; style-src 'unsafe-inline'"}});
       }
@@ -118,6 +123,9 @@ export function createHandler(c:Settings,db=new Store(c)){
         await db.db('relay_v3_limits?key=eq.pin.'+s.hash,'DELETE');return json({ok:true});
       }
       const s=await session(token);
+      if(action==='/large-init'&&req.method==='POST')return json(await large.init(await readJson(req,8192),s.hash));
+      if(action==='/large-finish'&&req.method==='POST')return json(await large.finish(await readJson(req)));
+      if(action==='/large-download-ticket'&&req.method==='POST')return json(await large.downloadTicket(await readJson(req)));
       if(action==='/lock'&&req.method==='POST'){
         const replacement=randomToken();const expiry=await db.rpc<string|null>('rotate_session',{p_old:s.hash,p_new:await hash(replacement)});
         if(!expiry)throw new RelayError(401,'session_expired');
@@ -138,7 +146,9 @@ export function createHandler(c:Settings,db=new Store(c)){
         return json({url:c.url+'/functions/v1/relay-v3/upload',ticket:payload+'.'+await hmac(c.ticket,'upload-v3.'+payload)});
       }
       if(action==='/file-url'&&req.method==='POST'){
-        const body=await readJson(req),id=validId(body.id),row=await liveFile(id),exp=Math.min(Date.now()+c.signedTtl*1000,Date.parse(row.expires_at));
+        const body=await readJson(req),id=validId(body.id),row=await liveFile(id);
+        if(row.large)throw new RelayError(400,'large_file_browser_only');
+        const exp=Math.min(Date.now()+c.signedTtl*1000,Date.parse(row.expires_at));
         const mode=body.mode==='download'?'download':body.mode==='preview'?'preview':'open';
         return json({url:`${c.url}/functions/v1/relay-v3/file/${id}?expires=${exp}&mode=${mode}&signature=${await hmac(c.link,`file-v3.${id}.${exp}.${mode}`)}`,expires_at:exp});
       }

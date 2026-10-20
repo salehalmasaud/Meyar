@@ -13,13 +13,13 @@
 <aside class="files-panel" aria-labelledby="files-heading"><div class="section-heading"><div><h3 id="files-heading">Files <span id="file-count" class="count">0</span></h3><p id="file-retention">Available for 24 hours</p></div><button id="delete-files" class="text-button danger" disabled>Delete all</button></div>
 <div id="drop" class="drop-zone"><span class="upload-icon" aria-hidden="true">↑</span><h4>Drop files here</h4><p>or <button id="choose" class="text-button">browse files</button></p><span>PDF & images · Up to 20 MB each</span><div class="paste-hint"><kbd>Ctrl</kbd> + <kbd>V</kbd> to paste a screenshot</div></div>
 <input id="file-input" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif" hidden><div id="queue" aria-live="polite"></div><div id="files" class="file-list"></div><p id="empty-files" class="empty-files">A quiet place for the files you need.</p><div class="file-foot">Private files. Links expire in 60 seconds.</div>
-<section id="drive-upload" class="drive-upload" aria-labelledby="drive-heading">
-  <div class="drive-top"><span class="drive-mark" aria-hidden="true">↗</span><span class="drive-eyebrow">GOOGLE DRIVE · LARGE FILES</span></div>
-  <h4 id="drive-heading">Upload larger files</h4>
-  <p>Multiple files, video and documents over 20 MB. Files go directly to your private Google Drive folder, not into Relay.</p>
-  <a id="drive-link" class="drive-link" href="https://drive.google.com/drive/folders/1_RPbbpfaIj74myGjIN5xbYftx5E1SIFl" target="_blank" rel="noopener noreferrer">Open Google Drive to upload <span aria-hidden="true">↗</span></a>
-  <p class="drive-instructions">In Drive, drag in your files or choose <strong>New → File upload</strong>. You can select many files, including 100 MB+, subject to available Drive storage.</p>
-  <small class="drive-privacy">Use only for files approved for personal cloud storage. Never upload patient-identifiable records to a personal Drive.</small>
+<section id="large-upload" class="large-upload" aria-labelledby="large-heading">
+  <div class="large-top"><span class="large-symbol" aria-hidden="true">⇧</span><span>SECURE LARGE TRANSFERS</span></div>
+  <h4 id="large-heading">Large files · up to 100 MB</h4>
+  <p>Upload from this workstation, then download from your laptop using the same private Trackcare Relay page. No other website is needed.</p>
+  <button id="large-choose" class="primary" type="button">Choose large files</button>
+  <input id="large-file-input" type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.zip,.docx,.xlsx,.pptx,.mp4,.mov" hidden>
+  <small>PDF, images, Word, Excel, PowerPoint, ZIP and videos. Encrypted, temporary and removed automatically after 24 hours.</small>
 </section></aside></div>
 <footer><button id="show-shortcuts" class="text-button">Keyboard shortcuts</button><span>No permanent history · Notes are read-only</span></footer>
 </section>

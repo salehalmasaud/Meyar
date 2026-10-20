@@ -8,7 +8,7 @@ export default async(req:Request,context:Context)=>{
     if(!(Netlify.env.get('RELAY_V3_ALLOWED_ORIGINS')||'').split(',').includes(origin))return reply({error:'unauthorized'},403);
     if(!['GET','POST'].includes(req.method))return reply({error:'method_not_allowed'},405);
     if(req.method==='POST'&&req.headers.get('origin')!==origin)return reply({error:'unauthorized'},403);
-    const routes=['/status','/exchange','/login','/lock','/config','/state','/upload-ticket','/file-url','/delete-notes','/delete-files','/oauth/authorize'];
+    const routes=['/status','/exchange','/login','/lock','/config','/state','/upload-ticket','/file-url','/delete-notes','/delete-files','/large-init','/large-finish','/large-download-ticket','/oauth/authorize'];
     if(!routes.includes(path))return reply({error:'not_found'},404);
     const body=req.method==='POST'?await readJson(req,24000):undefined;
     const response=await fetch(Netlify.env.get('RELAY_V3_EDGE_URL')+path+url.search,{method:req.method,headers:{'content-type':'application/json','x-relay-gateway':Netlify.env.get('RELAY_V3_GATEWAY_SECRET')||'','x-relay-origin':origin,'x-relay-client':context.ip||'unknown','x-relay-session':context.cookies.get('__Host-relay_v3')||''},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(50000)});

@@ -1,5 +1,6 @@
 import {RealtimeClient} from '@supabase/realtime-js';
 import {copyForTrackcare} from './clipboard.ts';
+import {SMALL_LIMIT,LARGE_LIMIT,extendedType,sendLarge,fetchLarge} from './large-transfer.ts';
 import {ordered,nextNote,metadata,activeNotes,remainingCount,expiryLabel,preference,type Note,type RelayFile} from './model.ts';
 const $=<T extends HTMLElement>(id:string)=>document.getElementById(id) as T;
 type Config={expires_at:string;text_ttl:number;file_ttl:number;realtime:{url:string;anon:string;topic:string}};
@@ -25,7 +26,7 @@ const time=(s:string)=>new Date(s).toLocaleTimeString([],{hour:'numeric',minute:
 const expiry=(s:string)=>{const m=Math.max(0,Math.ceil((Date.parse(s)-now())/60000));return m>60?`${Math.floor(m/60)}h ${m%60}m left`:`${m}m left`;};
 const size=(n:number)=>n<1048576?`${Math.max(1,Math.round(n/1024))} KB`:`${(n/1048576).toFixed(1)} MB`;
 const message=(s:string)=>{$('message').textContent=s;};
-const errors:Record<string,string>={invalid_pin:'That PIN is not correct.',invalid_access:'Open your saved private receiver URL.',try_later:'Too many attempts. Try again in 15 minutes.',session_expired:'Your session ended. Open your saved receiver URL to continue.',unsupported_file:'Choose a PDF, JPEG, PNG, WEBP, HEIC or HEIF file.',too_large:'This file is larger than 20 MB.',inbox_full:'Your inbox is full. Clear some items and retry.',file_expired:'This file has expired or was deleted.'};
+const errors:Record<string,string>={invalid_pin:'That PIN is not correct.',invalid_access:'Open your saved private receiver URL.',try_later:'Too many attempts. Try again in 15 minutes.',session_expired:'Your session ended. Open your saved receiver URL to continue.',unsupported_file:'Choose a PDF, JPEG, PNG, WEBP, HEIC or HEIF file.',too_large:'This file is larger than 20 MB.',inbox_full:'Your inbox is full. Clear some items and retry.',file_expired:'This file has expired or was deleted.',invalid_chunk:'Invalid file part.',chunk_conflict:'File part was changed.',incomplete_file:'Upload incomplete, please retry.',large_file_browser_only:'Download large files from the Relay page.'};
 class ApiError extends Error{constructor(public code:string,public status:number){super(errors[code]||'Unable to connect. Please try again.');}}
 async function request<T>(path:string,body?:unknown):Promise<T>{
  const controller=new AbortController();controllers.add(controller);const timer=setTimeout(()=>controller.abort(),55000);
@@ -140,9 +141,12 @@ function renderFiles(){
   const received=document.createElement('span');received.textContent='Received '+time(file.created_at);
   const exp=document.createElement('span');exp.dataset.expiryAbsolute=file.expires_at;exp.textContent=expiryLabel(file.expires_at,now());meta.append(document.createElement('br'),received,document.createElement('br'),exp);details.append(name,meta);
   const actions=document.createElement('div');actions.className='file-actions';
-  const callbacks:[string,()=>void][]=[['Preview',()=>void previewFile(file)],['Download',()=>void openFile(file,true)],['Delete',()=>confirm('Delete this file?','It will be removed from the inbox. This cannot be undone.','Delete',async()=>{await request('/delete-files',{ids:[file.id]});await refresh();})]];
+  const deleting:[string,()=>void]=['Delete',()=>confirm('Delete this file?','It will be removed from the inbox. This cannot be undone.','Delete',async()=>{await request('/delete-files',{ids:[file.id]});await refresh();})];
+  const callbacks:[string,()=>void][]=file.large
+    ? [['Download',()=>{void fetchLarge(file,request,()=>!!config&&g===generation,p=>message('Downloading '+file.name+' · '+p+'%')).then(()=>message('Download ready: '+file.name)).catch(e=>message(e instanceof Error?e.message:'Download failed'));}],deleting]
+    : [['Preview',()=>void previewFile(file)],['Download',()=>void openFile(file,true)],deleting];
   for(const[label,fn]of callbacks){const b=document.createElement('button');b.className='text-button'+(label==='Delete'?' danger':'');b.textContent=label;b.setAttribute('aria-label',`${label} ${file.name}`);b.onclick=fn;actions.append(b);}row.append(icon,details,actions);$('files').append(row);
-  if(file.mime.startsWith('image/')){
+  if(file.mime.startsWith('image/')&&!file.large){
    // Mint the short-lived URL when the card approaches the viewport, so lazy
    // thumbnails further down a long inbox do not expire before their first load.
    const observer=new IntersectionObserver(entries=>{if(!entries.some(e=>e.isIntersecting))return;observer.disconnect();thumbnailObservers.delete(observer);
@@ -168,8 +172,9 @@ function queueFiles(incoming:File[],pasted=false){
   const row=document.createElement('div');row.className='queue-item';const name=document.createElement('span');name.className='queue-name';name.textContent=pasted?'Pasted image':file.name;
   const label=document.createElement('span');label.className='queue-status';label.textContent='Queued';const progress=document.createElement('progress');progress.max=100;progress.value=0;progress.setAttribute('aria-label','Upload progress');
   const retry=document.createElement('button');retry.textContent='Retry';retry.hidden=true;row.append(name,label,progress,retry);$('queue').append(row);
-  const run=async()=>{if(g!==generation)return;retry.hidden=true;if(file.size>20*1024*1024){label.textContent='Over 20 MB · use Google Drive below';retry.textContent='Open Drive';retry.onclick=()=>$<HTMLAnchorElement>('drive-link').click();retry.hidden=false;return;}label.textContent='Uploading…';if(pasted)message('Pasted image — uploading…');
-   try{await upload(file,n=>{progress.value=n;label.textContent=n===100?'Uploaded ✓':n>=95?'Finishing…':`${n}%`;});if(g!==generation)return;message(pasted?'Pasted image — Uploaded ✓':'Uploaded ✓');await refresh();setTimeout(()=>row.remove(),4000);}
+  const run=async()=>{if(g!==generation)return;retry.hidden=true;if(file.size>LARGE_LIMIT){label.textContent='Larger than 100 MB';return;}label.textContent='Uploading…';if(pasted)message('Pasted image — uploading…');
+   try{const transfer=file.size>SMALL_LIMIT||extendedType(file.name)?(f:File,p:(n:number)=>void)=>sendLarge(f,request,uploads,()=>g===generation&&!!config,p):upload;
+    await transfer(file,n=>{progress.value=n;label.textContent=n===100?'Uploaded ✓':n>=95?'Finishing…':`${n}%`;});if(g!==generation)return;message(pasted?'Pasted image — Uploaded ✓':'Uploaded ✓');await refresh();setTimeout(()=>row.remove(),4000);}
    catch(e){if(g!==generation)return;label.textContent=e instanceof Error?e.message:'Upload failed';retry.hidden=false;}
   };
   retry.onclick=()=>{tail=tail.then(run);};tail=tail.then(run);
@@ -183,6 +188,7 @@ $('clear-all').onclick=()=>{const ids=notes.map(n=>n.id);confirm(`Clear all ${id
 $('delete-files').onclick=()=>{const ids=files.map(f=>f.id);confirm(`Delete all ${ids.length} files?`,'These files will be removed. Notes are kept.','Delete all',async()=>{await request('/delete-files',{ids});await refresh();});};
 $('lock').onclick=async()=>{hideWorkspace();$<HTMLButtonElement>('unlock').disabled=true;try{await request('/lock',{});$<HTMLButtonElement>('unlock').disabled=false;$('code').focus();}catch{hideWorkspace('The screen is locked locally. Server lock could not be confirmed; close this browser if shared.');}};
 const input=$<HTMLInputElement>('file-input');$('choose').onclick=()=>input.click();input.onchange=()=>{queueFiles(Array.from(input.files||[]));input.value='';};
+const largeInput=$<HTMLInputElement>('large-file-input');$('large-choose').onclick=()=>largeInput.click();largeInput.onchange=()=>{queueFiles(Array.from(largeInput.files||[]));largeInput.value='';};
 const drop=$('drop');for(const event of ['dragenter','dragover'])drop.addEventListener(event,e=>{e.preventDefault();drop.classList.add('drag');});for(const event of ['dragleave','drop'])drop.addEventListener(event,e=>{e.preventDefault();drop.classList.remove('drag');});drop.addEventListener('drop',e=>queueFiles(Array.from((e as DragEvent).dataTransfer?.files||[])));
 document.addEventListener('paste',e=>{if(!config||typing(e.target))return;const images=Array.from(e.clipboardData?.items||[]).filter(i=>i.kind==='file'&&i.type.startsWith('image/')).map(i=>i.getAsFile()).filter((f):f is File=>!!f).map((f,i)=>new File([f],`Screenshot-${new Date().toISOString().replace(/[:.]/g,'-')}-${i+1}.${f.type.split('/')[1]||'png'}`,{type:f.type}));if(images.length){e.preventDefault();queueFiles(images,true);}});
 $<HTMLSelectElement>('theme').value=theme;$('theme').onchange=()=>{theme=$<HTMLSelectElement>('theme').value;persist('relay-v3-theme',theme);applyTheme();};

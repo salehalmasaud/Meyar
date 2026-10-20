@@ -26,16 +26,13 @@ dialog{box-shadow:0 14px 55px #0003}dialog::backdrop{background:#101b18a6;backdr
 @media(max-width:1050px){.site-header{padding:0 28px}.theme-label{font-size:0}.note-text{font-size:13px}}
 @media(max-width:760px){.site-header{height:auto;min-height:84px;padding:16px 18px;gap:14px;flex-wrap:wrap}.header-end{gap:14px;margin-left:auto}.brand p{font-size:10px}.brand h1{font-size:17px}.overview{padding:25px 0}.overview h2{font-size:31px}.summary span{font-size:11px}.summary .retention{font-size:10px}.note-text{font-size:13px;margin:14px 18px}.note-top{padding-left:18px;padding-right:18px}.note-patient,.note-dx{margin-left:18px;margin-right:18px}.note-bottom{padding:11px 17px;flex-wrap:wrap}.note-actions{margin-left:auto}.section-heading{gap:12px}.section-heading .primary{font-size:12px;padding:10px}.preview-dialog{width:calc(100% - 24px);padding:16px}.preview-heading{flex-wrap:wrap}.preview-heading h3{font-size:15px}.toolbar{gap:8px}.toolbar>div{width:100%;justify-content:flex-end}.file-foot{font-size:11px}}
 
-/* Large file handoff: opening the private Drive folder, without proxying file bytes through Relay. */
-.drive-upload{margin-top:22px;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink)}
-.drive-top{display:flex;align-items:center;gap:9px}
-.drive-mark{width:30px;height:30px;display:grid;place-items:center;border-radius:8px;background:var(--tint);color:var(--accent);font-weight:700;font-size:18px}
-.drive-eyebrow{font-size:10px;letter-spacing:.65px;font-weight:700;color:var(--muted)}
-.drive-upload h4{font-size:15px;line-height:1.35;margin:13px 0 8px}
-.drive-upload p{font-size:12px;line-height:1.65;color:var(--muted);margin:0 0 14px}
-.drive-link{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--accent);background:var(--accent);color:var(--surface);text-decoration:none;font-size:12px;font-weight:650;line-height:1.3;padding:12px 13px;border-radius:9px;transition:filter .15s ease}
-.drive-link:hover{filter:brightness(.92)}.drive-link:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
-.drive-upload .drive-instructions{margin:13px 0 0;font-size:11px}
-.drive-privacy{display:block;font-size:10px;line-height:1.65;color:var(--muted);border-top:1px solid var(--line);padding-top:12px;margin-top:13px}
-@media(max-width:760px){.drive-upload{padding:17px}.drive-upload h4{font-size:14px}}
-@media(prefers-reduced-motion:reduce){.drive-link{transition:none}}
+
+/* Private large-file transfer uses the existing Relay session and backend. */
+.large-upload{margin-top:22px;padding:17px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink)}
+.large-top{display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:.6px;font-weight:700;color:var(--muted)}
+.large-symbol{width:30px;height:30px;border-radius:8px;background:var(--tint);color:var(--accent);display:grid;place-items:center;font-size:18px}
+.large-upload h4{font-size:15px;line-height:1.35;margin:12px 0 8px}
+.large-upload p{font-size:12px;line-height:1.65;color:var(--muted);margin:0 0 13px}
+.large-upload button.primary{display:block;width:100%;padding:12px 14px;text-align:center;font-size:12px}
+.large-upload small{display:block;font-size:11px;color:var(--muted);line-height:1.65;margin-top:12px}
+@media(max-width:760px){.large-upload{padding:16px}.large-upload h4{font-size:14px}}
