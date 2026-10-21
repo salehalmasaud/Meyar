@@ -61,7 +61,7 @@ export const listFilesTool={
 export const getFileTool={
   name:'get_file',
   title:'Get Relay file',
-  description:'Retrieves one active file from the private Trackcare Relay V3 inbox. For normal PDF/image files larger than 2 MiB, get_file also supports file_id='<UUID>:part0', ':part1', etc., returning 2 MiB binary chunks in order for reliable reconstruction. Embeds PDF/image resources up to 14 MiB and multipart documents (including XLSX) up to 2 MiB. Larger multipart files stay browser-only. Signed download URLs expire in at most 60 seconds and must not be presented as durable download links. This is read-only and never changes or deletes files.',
+  description:'Retrieves one active file from the private Trackcare Relay V3 inbox. For normal PDF/image files larger than 2 MiB, get_file also supports file_id values UUID:part0, UUID:part1, etc., returning 2 MiB binary chunks in order for reliable reconstruction. Embeds PDF/image resources up to 14 MiB and multipart documents (including XLSX) up to 2 MiB. Larger multipart files stay browser-only. Signed download URLs expire in at most 60 seconds and must not be presented as durable download links. This is read-only and never changes or deletes files.',
   inputSchema:{
     type:'object',
     properties:{file_id:{type:'string',description:'The Relay file ID returned by list_files.'}},
