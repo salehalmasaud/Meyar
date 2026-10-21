@@ -61,7 +61,7 @@ export const listFilesTool={
 export const getFileTool={
   name:'get_file',
   title:'Get Relay file',
-  description:'Retrieves one active file from the private Trackcare Relay V3 inbox by the file_id returned from list_files. Returns an embedded PDF/image resource for files up to 2 MiB and a readable MCP resource for larger files. Signed download URLs expire in at most 60 seconds and must not be presented as durable download links. This is read-only and never changes or deletes files.',
+  description:'Retrieves one active file from the private Trackcare Relay V3 inbox by the file_id returned from list_files. Embeds PDF/image resources up to 14 MiB and multipart documents (including XLSX) up to 2 MiB. Larger multipart files stay browser-only. Signed download URLs expire in at most 60 seconds and must not be presented as durable download links. This is read-only and never changes or deletes files.',
   inputSchema:{
     type:'object',
     properties:{file_id:{type:'string',description:'The Relay file ID returned by list_files.'}},
@@ -140,6 +140,19 @@ export function createConnector(c:Settings,db:Store){
     return JSON.parse(await decryptText(await(await db.get(id,'meta')).json(),c.encryption,'file-info-v3.'+id)) as {name:string};
   }
 
+  async function fileBytes(row:FileRow):Promise<Uint8Array>{
+    if(row.large){
+      if(row.size>2*1024*1024)throw new RelayError(413,'large_file_browser_only');
+      const encrypted=new Uint8Array(await(await db.get(row.id,'chunk-00')).arrayBuffer());
+      const bytes=await decryptBytes(encrypted,c.encryption,'large-file-v3.'+row.id+'.0');
+      if(bytes.length!==row.size)throw new RelayError(503,'invalid_file');
+      return bytes;
+    }
+    const encrypted=new Uint8Array(await(await db.get(row.id,'data')).arrayBuffer());
+    const bytes=await decryptBytes(encrypted,c.encryption,'file-data-v3.'+row.id);
+    if(bytes.length!==row.size)throw new RelayError(503,'invalid_file');
+    return bytes;
+  }
   async function activeFiles(){
     return db.db<FileRow[]>('relay_v3_objects?kind=eq.file&ready=eq.true&expires_at=gt.'+current()+'&order=created_at.desc&limit=100');
   }
@@ -301,7 +314,7 @@ export function createConnector(c:Settings,db:Store){
             protocolVersion:['2024-11-05','2025-03-26','2025-06-18','2025-11-25'].includes(String(body?.protocolVersion))?body.protocolVersion:'2025-06-18',
             capabilities:{tools:{},resources:{}},
             serverInfo:{name:'trackcare-relay-v3',version:'3.2.0'},
-            instructions:'For an uploaded Relay file, call list_files with the filename or part of it, then call get_file with the selected file_id. The get_file result embeds image/PDF bytes for files up to 2 MiB. For larger files use resources/read on the relay:// URI. Never rely on the expiring download_url as a persistent chat attachment. File reads are read-only. Never delete or change Relay content.'
+            instructions:'For an uploaded Relay file, call list_files with the filename or part of it, then call get_file with the selected file_id. The get_file result embeds PDF/image files up to 14 MiB and small multipart files including XLSX up to 2 MiB. Larger multipart files must be downloaded from the private Relay page. Never rely on the expiring download_url as a persistent chat attachment. File reads are read-only. Never delete or change Relay content.'
           },{'mcp-session-id':session});
         }
 
@@ -314,9 +327,8 @@ export function createConnector(c:Settings,db:Store){
           const match=/^relay:\/\/file\/([0-9a-f-]{36})$/.exec(params.uri);
           if(!match||!UUID.test(match[1]))throw new RelayError(400,'invalid_request');
           const row=await liveFile(match[1]);
-          if(row.large)throw new RelayError(413,'large_file_browser_only');
-          const encrypted=new Uint8Array(await(await db.get(row.id,'data')).arrayBuffer());
-          const data=await decryptBytes(encrypted,c.encryption,'file-data-v3.'+row.id);
+          if(row.size>14*1024*1024)throw new RelayError(413,'file_too_large_for_chat');
+          const data=await fileBytes(row);
           return result({contents:[{uri:params.uri,mimeType:row.mime,blob:mcpBlobBase64(data)}]});
         }
         if(b.method==='tools/list')return result({tools:[sendTool,listFilesTool,getFileTool]});
@@ -374,21 +386,20 @@ export function createConnector(c:Settings,db:Store){
             if(Object.keys(args).length!==1||typeof args.file_id!=='string')throw new RelayError(400,'invalid_request');
             try{
               const row=await liveFile(args.file_id);
-              if(row.large)return result({isError:true,content:[{type:'text',text:'Large file: open your private Trackcare Relay page from your laptop and use Download. The large file is not attached to ChatGPT.'}]});
+              if(row.large&&row.size>2*1024*1024)return result({isError:true,content:[{type:'text',text:'Large file: open your private Trackcare Relay page from your laptop and use Download. The large file is not attached to ChatGPT.'}]});
               const item=await fileItem(row);
               const exp=Math.min(Date.now()+c.signedTtl*1000,Date.parse(row.expires_at));
               if(exp<=Date.now())throw new RelayError(404,'file_expired');
               const mode='download';
               const signature=await hmac(c.link,'file-v3.'+row.id+'.'+exp+'.'+mode);
-              const uri=c.url+'/functions/v1/relay-v3/file/'+row.id+'?expires='+exp+'&mode='+mode+'&signature='+signature;
+              const uri=row.large?'':c.url+'/functions/v1/relay-v3/file/'+row.id+'?expires='+exp+'&mode='+mode+'&signature='+signature;
               const file={...item,download_url:uri,link_expires_at:exp};
               // Small files travel with the tool result, so ChatGPT does not
               // have to hand the user a signed URL that expires within 60 s.
               const relayUri='relay://file/'+row.id;
               const content:Array<Record<string,unknown>>=[];
-              if(row.size<=2*1024*1024){
-                const encrypted=new Uint8Array(await(await db.get(row.id,'data')).arrayBuffer());
-                const bytes=await decryptBytes(encrypted,c.encryption,'file-data-v3.'+row.id);
+              if(row.size<=14*1024*1024){
+                const bytes=await fileBytes(row);
                 content.push({type:'resource',resource:{uri:relayUri,mimeType:row.mime,blob:mcpBlobBase64(bytes)}});
               }
               content.push(
