@@ -61,7 +61,7 @@ export const listFilesTool={
 export const getFileTool={
   name:'get_file',
   title:'Get Relay file',
-  description:'Retrieves one active file from the private Trackcare Relay V3 inbox by the file_id returned from list_files. Embeds PDF/image resources up to 14 MiB and multipart documents (including XLSX) up to 2 MiB. Larger multipart files stay browser-only. Signed download URLs expire in at most 60 seconds and must not be presented as durable download links. This is read-only and never changes or deletes files.',
+  description:'Retrieves one active file from the private Trackcare Relay V3 inbox. For normal PDF/image files larger than 2 MiB, get_file also supports file_id='<UUID>:part0', ':part1', etc., returning 2 MiB binary chunks in order for reliable reconstruction. Embeds PDF/image resources up to 14 MiB and multipart documents (including XLSX) up to 2 MiB. Larger multipart files stay browser-only. Signed download URLs expire in at most 60 seconds and must not be presented as durable download links. This is read-only and never changes or deletes files.',
   inputSchema:{
     type:'object',
     properties:{file_id:{type:'string',description:'The Relay file ID returned by list_files.'}},
@@ -385,7 +385,26 @@ export function createConnector(c:Settings,db:Store){
             if(!hasScope(auth,fileScope))return insufficient();
             if(Object.keys(args).length!==1||typeof args.file_id!=='string')throw new RelayError(400,'invalid_request');
             try{
-              const row=await liveFile(args.file_id);
+              const virtualPart=/^([0-9a-f-]{36}):part([0-9]{1,2})$/.exec(args.file_id);
+              const row=await liveFile(virtualPart?virtualPart[1]:args.file_id);
+              if(virtualPart){
+                const index=Number(virtualPart[2]),partSize=2*1024*1024;
+                if(row.large||row.size<=partSize)throw new RelayError(400,'invalid_request');
+                const count=Math.ceil(row.size/partSize);
+                if(index>=count)throw new RelayError(400,'invalid_request');
+                const item=await fileItem(row),bytes=await fileBytes(row);
+                const part=bytes.slice(index*partSize,Math.min(bytes.length,(index+1)*partSize));
+                const partName=item.name+'.part'+String(index).padStart(2,'0');
+                const resourceUri='relay://file/'+row.id+'/part/'+index;
+                return result({
+                  structuredContent:{file:{...item,name:partName,mime:'application/octet-stream',size:part.length,download_url:'',link_expires_at:Date.now()+60000}},
+                  content:[
+                    {type:'resource',resource:{uri:resourceUri,mimeType:'application/octet-stream',blob:mcpBlobBase64(part)}},
+                    {type:'text',text:'Binary part '+(index+1)+'/'+count+' for '+item.name}
+                  ],
+                  isError:false
+                });
+              }
               if(row.large&&row.size>2*1024*1024)return result({isError:true,content:[{type:'text',text:'Large file: open your private Trackcare Relay page from your laptop and use Download. The large file is not attached to ChatGPT.'}]});
               const item=await fileItem(row);
               const exp=Math.min(Date.now()+c.signedTtl*1000,Date.parse(row.expires_at));
