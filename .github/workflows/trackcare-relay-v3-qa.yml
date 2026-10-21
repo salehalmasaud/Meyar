@@ -4,6 +4,7 @@ on:
     branches:
       - trackcare-relay-v3-drive-handoff-20261018
       - trackcare-relay-v3-file-export-20261021
+      - trackcare-relay-v3-chunked-export-20261021
       - trackcare-relay-v3
     paths:
       - 'v3/**'
