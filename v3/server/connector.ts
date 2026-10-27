@@ -61,7 +61,7 @@ export const listFilesTool={
 export const getFileTool={
   name:'get_file',
   title:'Get Relay file',
-  description:'Retrieves one active file from the private Trackcare Relay V3 inbox. For normal PDF/image files larger than 2 MiB, get_file also supports file_id values UUID:part0, UUID:part1, etc., returning 2 MiB binary chunks in order for reliable reconstruction. Embeds PDF/image resources up to 14 MiB and multipart documents (including XLSX) up to 2 MiB. Larger multipart files stay browser-only. Signed download URLs expire in at most 60 seconds and must not be presented as durable download links. This is read-only and never changes or deletes files.',
+  description:'Retrieves one active file from the private Trackcare Relay V3 inbox. For PDF/image and multipart files larger than 2 MiB, get_file supports file_id values UUID:part0, UUID:part1, etc., returning authenticated 2 MiB binary chunks in order for reliable reconstruction. Embeds PDF/image resources up to 14 MiB and multipart documents (including XLSX) up to 2 MiB. Larger multipart files stay browser-only. Signed download URLs expire in at most 60 seconds and must not be presented as durable download links. This is read-only and never changes or deletes files.',
   inputSchema:{
     type:'object',
     properties:{file_id:{type:'string',description:'The Relay file ID returned by list_files.'}},
@@ -389,11 +389,28 @@ export function createConnector(c:Settings,db:Store){
               const row=await liveFile(virtualPart?virtualPart[1]:args.file_id);
               if(virtualPart){
                 const index=Number(virtualPart[2]),partSize=2*1024*1024;
-                if(row.large||row.size<=partSize)throw new RelayError(400,'invalid_request');
+                if(row.size<=partSize)throw new RelayError(400,'invalid_request');
                 const count=Math.ceil(row.size/partSize);
                 if(index>=count)throw new RelayError(400,'invalid_request');
-                const item=await fileItem(row),bytes=await fileBytes(row);
-                const part=bytes.slice(index*partSize,Math.min(bytes.length,(index+1)*partSize));
+                const item=await fileItem(row);
+                let part:Uint8Array;
+                if(row.large){
+                  // Large-file Storage objects contain individually encrypted 4 MiB
+                  // chunks. Export only a bounded 2 MiB half, after full GCM
+                  // authentication and length validation. File-read scope and
+                  // liveFile's readiness/TTL checks already apply above.
+                  const chunkIndex=Math.floor(index/2);
+                  const encrypted=new Uint8Array(await(await db.get(row.id,'chunk-'+String(chunkIndex).padStart(2,'0'))).arrayBuffer());
+                  const decoded=await decryptBytes(encrypted,c.encryption,'large-file-v3.'+row.id+'.'+chunkIndex);
+                  const expectedChunk=Math.min(4*1024*1024,row.size-chunkIndex*4*1024*1024);
+                  if(decoded.length!==expectedChunk)throw new RelayError(503,'invalid_file');
+                  const offset=(index%2)*partSize;
+                  part=decoded.slice(offset,Math.min(decoded.length,offset+partSize));
+                }else{
+                  const bytes=await fileBytes(row);
+                  part=bytes.slice(index*partSize,Math.min(bytes.length,(index+1)*partSize));
+                }
+                if(part.length!==Math.min(partSize,row.size-index*partSize))throw new RelayError(503,'invalid_file');
                 const partName=item.name+'.part'+String(index).padStart(2,'0');
                 const resourceUri='relay://file/'+row.id+'/part/'+index;
                 return result({
