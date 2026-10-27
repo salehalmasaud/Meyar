@@ -3,10 +3,10 @@ on:
   push:
     branches:
       - trackcare-relay-v3
-      - trackcare-relay-v3-large-readparts-20261027-drive-handoff-20261018
+      - trackcare-relay-v3-drive-handoff-20261018
       - trackcare-relay-v3-file-export-20261021
       - trackcare-relay-v3-chunked-export-20261021
-      - trackcare-relay-v3
+      - trackcare-relay-v3-large-readparts-20261027
     paths:
       - 'v3/**'
       - '.github/workflows/trackcare-relay-v3-qa.yml'
