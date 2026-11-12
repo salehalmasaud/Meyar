@@ -1,0 +1,3 @@
+project_id = "trackcare-relay-v2"
+[functions.relay-v2]
+verify_jwt = false
